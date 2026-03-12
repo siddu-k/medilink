@@ -212,6 +212,31 @@ async function createPatientRecord(userId, profile) {
     } catch { return null; }
 }
 
+// Upload profile photo to Supabase storage and update record
+async function uploadProfilePhoto(file, recordId, table) {
+    const sb = getSupabase();
+    if (!sb || !file) return null;
+    // Validate file type
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowed.includes(file.type)) { showToast('Only JPG, PNG, WEBP allowed', 'error'); return null; }
+    if (file.size > 5 * 1024 * 1024) { showToast('Max file size is 5MB', 'error'); return null; }
+    try {
+        const ext = file.name.split('.').pop();
+        const path = `profile-photos/${table}/${recordId}.${ext}`;
+        // Remove old photo if exists (overwrite)
+        await sb.storage.from('medical-files').remove([path]);
+        const { error: upErr } = await sb.storage.from('medical-files').upload(path, file, { upsert: true });
+        if (upErr) { console.error('Photo upload error:', upErr); return null; }
+        const { data: { publicUrl } } = sb.storage.from('medical-files').getPublicUrl(path);
+        // Add cache-bust to avoid stale images
+        const freshUrl = publicUrl + '?t=' + Date.now();
+        // Update the record's photo column
+        const photoCol = table === 'doctors' ? 'image' : 'photo';
+        await sb.from(table).update({ [photoCol]: freshUrl }).eq('id', recordId);
+        return freshUrl;
+    } catch (e) { console.error('Photo upload error:', e); return null; }
+}
+
 // ===== FALLBACK DATA (used when Supabase isn't set up yet) =====
 function getFallbackPatients() {
     return [
