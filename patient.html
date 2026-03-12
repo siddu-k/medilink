@@ -312,6 +312,14 @@
 
             // Set min date for booking
             document.getElementById('docDate').min = new Date().toISOString().split('T')[0];
+
+            // Auto-open booking if ?book=doctorId from QR scan
+            const bookDocId = new URLSearchParams(window.location.search).get('book');
+            if (bookDocId) {
+                showNewApptModal(bookDocId);
+                // Clean URL
+                window.history.replaceState({}, '', 'patient.html');
+            }
         }
 
         function switchTab(tabId, btn) {
@@ -420,17 +428,32 @@
             new QRCode(document.getElementById('cardQrCode'), { text: qrUrl, width: 44, height: 44, colorDark: "#059669", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H });
         }
 
-        function showNewApptModal() {
+        function formatSlotTime(t) {
+            if (!t) return t;
+            // If already has AM/PM, return as-is
+            if (/[AP]M/i.test(t)) return t;
+            const [h, m] = t.split(':');
+            const hr = parseInt(h, 10);
+            const ampm = hr >= 12 ? 'PM' : 'AM';
+            return ((hr % 12) || 12) + ':' + m + ' ' + ampm;
+        }
+
+        function showNewApptModal(preselectedDocId) {
             document.getElementById('bookingModal').classList.remove('hidden');
             const docSelect = document.getElementById('docSelect');
             docSelect.innerHTML = doctorsList.map(d => `<option value="${d.id}">${d.name} - ${d.specialty} (${d.hospital})</option>`).join('');
+            if (preselectedDocId) {
+                docSelect.value = preselectedDocId;
+            }
             updateDocSlots();
         }
 
         function updateDocSlots() {
             const docId = document.getElementById('docSelect').value;
             const doc = doctorsList.find(d => d.id == docId);
-            document.getElementById('docTime').innerHTML = doc && doc.slots ? doc.slots.map(s => `<option value="${s}">${s}</option>`).join('') : '<option>No slots</option>';
+            document.getElementById('docTime').innerHTML = doc && doc.slots && doc.slots.length > 0
+                ? doc.slots.map(s => `<option value="${s}">${formatSlotTime(s)}</option>`).join('')
+                : '<option>No slots available</option>';
         }
 
         async function confirmBooking() {
