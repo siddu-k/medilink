@@ -115,19 +115,37 @@
 
                 activeDoctor = doctor;
                 activeDoctorProfile = profile;
-                showActiveDoctorBar();
+
+                // Check if this patient is already linked to this doctor
+                let alreadyLinked = false;
+                if (currentPatientId) {
+                    const { data: link } = await sb.from('doctor_patients')
+                        .select('id')
+                        .eq('doctor_id', doctor.id)
+                        .eq('patient_id', currentPatientId)
+                        .maybeSingle();
+                    alreadyLinked = !!link;
+                }
+
+                showActiveDoctorBar(alreadyLinked);
             } catch (e) {
                 console.warn('Doctor session check:', e);
             }
         }
 
-        function showActiveDoctorBar() {
+        function showActiveDoctorBar(alreadyLinked) {
             document.getElementById('doctorLoginFields').classList.add('hidden');
             document.getElementById('doctorActiveSession').classList.remove('hidden');
             document.getElementById('doctorActiveSession').style.display = 'flex';
             document.getElementById('doctorBarLabel').textContent = 'Dr. ' + (activeDoctor.name || activeDoctorProfile.full_name);
             document.getElementById('doctorBarHint').textContent = 'Logged in';
             document.getElementById('doctorBarHint').style.color = 'var(--emerald-600)';
+
+            if (alreadyLinked) {
+                // Hide Add Patient button, show already-linked state
+                document.getElementById('addPatientBtn').style.display = 'none';
+                document.getElementById('activeDoctorName').innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="3" style="vertical-align:middle;margin-right:.25rem"><path d="M20 6L9 17l-5-5"/></svg><span style="color:var(--emerald-600)">Already added</span>';
+            }
         }
 
         function renderProfile() {
@@ -150,7 +168,7 @@
                     <div style="display:flex;align-items:center;gap:2rem;flex-wrap:wrap">
                         <div style="position:relative">
                             <img src="${p.photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(p.name) + '&size=192&background=059669&color=fff'}" 
-                                 style="width:10rem;height:10rem;border-radius:2rem;object-fit:cover;border:6px solid var(--emerald-100);box-shadow:0 10px 30px rgba(0,0,0,.1)" class="anim-float" alt="${p.name}">
+                                 style="width:10rem;height:10rem;border-radius:2rem;object-fit:cover;border:6px solid var(--emerald-100);box-shadow:0 10px 30px rgba(0,0,0,.1)" alt="${p.name}">
                             <div style="position:absolute;bottom:-.5rem;right:-.5rem;background:var(--emerald-500);padding:.6rem;border-radius:1rem;color:#fff;border:3px solid #fff;box-shadow:0 4px 12px rgba(5,150,105,.3)">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
                             </div>
