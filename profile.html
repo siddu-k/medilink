@@ -22,9 +22,16 @@
                 <path d="M8 15v1a6 6 0 006 6v0a6 6 0 006-6v-4" />
                 <circle cx="20" cy="10" r="2" />
             </svg>
-            <span style="font-weight:700;font-size:.85rem">Doctor?</span>
-            <span style="font-size:.75rem;opacity:.8">Login to add this patient to your dashboard</span>
+            <span style="font-weight:700;font-size:.85rem" id="doctorBarLabel">Doctor?</span>
+            <span style="font-size:.75rem;opacity:.8" id="doctorBarHint">Login to add this patient to your dashboard</span>
         </div>
+        <!-- Active doctor session (shown when already logged in) -->
+        <div id="doctorActiveSession" class="hidden" style="display:flex;gap:.5rem;align-items:center">
+            <span style="font-size:.8rem;font-weight:700;color:var(--emerald-600)" id="activeDoctorName"></span>
+            <button onclick="addPatientFromSession()" class="btn btn-primary btn-sm" id="addPatientBtn">Add Patient</button>
+            <button onclick="doctorLogoutFromProfile()" class="btn btn-sm" style="font-size:.7rem;opacity:.7">Logout</button>
+        </div>
+        <!-- Login fields (shown when not logged in) -->
         <div style="display:flex;gap:.5rem;align-items:center" id="doctorLoginFields">
             <input type="email" id="docEmail" placeholder="Email" class="input" style="width:12rem">
             <input type="password" id="docPassword" placeholder="Password" class="input" style="width:8rem">
@@ -50,6 +57,8 @@
         let currentPatientId = null;
         let currentPatient = null;
         let currentReports = [];
+        let activeDoctor = null; // Stores logged-in doctor record
+        let activeDoctorProfile = null;
 
         async function init() {
             // Get patient ID from URL: profile.html?id=ML-2024-001
@@ -70,6 +79,10 @@
             }
 
             await waitForSupabase();
+
+            // Check if a doctor is already logged in
+            await checkExistingDoctorSession();
+
             currentPatient = await fetchPatient(currentPatientId);
             currentReports = await fetchReports(currentPatientId);
 
@@ -84,6 +97,37 @@
             }
 
             renderProfile();
+        }
+
+        // Check if a doctor is already logged in from a previous session
+        async function checkExistingDoctorSession() {
+            const sb = await waitForSupabase();
+            if (!sb) return;
+            try {
+                const { data: { user } } = await sb.auth.getUser();
+                if (!user) return;
+                const { data: profile } = await sb.from('profiles').select('*').eq('id', user.id).single();
+                if (!profile || profile.role !== 'doctor') return;
+
+                // Doctor is logged in — find their doctor record
+                const doctor = await findDoctorByUserId(user.id);
+                if (!doctor) return;
+
+                activeDoctor = doctor;
+                activeDoctorProfile = profile;
+                showActiveDoctorBar();
+            } catch (e) {
+                console.warn('Doctor session check:', e);
+            }
+        }
+
+        function showActiveDoctorBar() {
+            document.getElementById('doctorLoginFields').classList.add('hidden');
+            document.getElementById('doctorActiveSession').classList.remove('hidden');
+            document.getElementById('doctorActiveSession').style.display = 'flex';
+            document.getElementById('doctorBarLabel').textContent = 'Dr. ' + (activeDoctor.name || activeDoctorProfile.full_name);
+            document.getElementById('doctorBarHint').textContent = 'Logged in';
+            document.getElementById('doctorBarHint').style.color = 'var(--emerald-600)';
         }
 
         function renderProfile() {
@@ -183,7 +227,43 @@
             `;
         }
 
-        // Doctor Quick Login on profile page
+        // Add patient from existing doctor session (no re-login needed)
+        async function addPatientFromSession() {
+            if (!activeDoctor || !currentPatientId) return;
+            const btn = document.getElementById('addPatientBtn');
+            btn.textContent = 'Linking...'; btn.disabled = true;
+
+            const linked = await linkPatientToDoctor(activeDoctor.id, currentPatientId);
+
+            document.getElementById('doctorActiveSession').classList.add('hidden');
+            document.getElementById('doctorLinked').classList.remove('hidden');
+            document.getElementById('doctorLinked').style.display = 'flex';
+
+            if (linked) {
+                document.getElementById('linkedMsg').textContent = `✓ ${currentPatient.name || 'Patient'} linked to Dr. ${activeDoctor.name}'s dashboard!`;
+                showToast('Patient linked to your dashboard!', 'success');
+            } else {
+                document.getElementById('linkedMsg').textContent = `Patient already in your dashboard`;
+                showToast('Patient already linked!', 'info');
+            }
+        }
+
+        // Logout doctor from profile page bar
+        async function doctorLogoutFromProfile() {
+            const sb = await waitForSupabase();
+            if (sb) await sb.auth.signOut();
+            activeDoctor = null;
+            activeDoctorProfile = null;
+            document.getElementById('doctorActiveSession').classList.add('hidden');
+            document.getElementById('doctorActiveSession').style.display = 'none';
+            document.getElementById('doctorLoginFields').classList.remove('hidden');
+            document.getElementById('doctorBarLabel').textContent = 'Doctor?';
+            document.getElementById('doctorBarHint').textContent = 'Login to add this patient to your dashboard';
+            document.getElementById('doctorBarHint').style.color = '';
+            showToast('Logged out', 'info');
+        }
+
+        // Doctor Quick Login on profile page (when not already logged in)
         async function handleDoctorLogin() {
             const email = document.getElementById('docEmail').value;
             const password = document.getElementById('docPassword').value;
@@ -213,16 +293,13 @@
 
             // If no doctor record linked to this user, try to create/find by name
             if (!doctor) {
-                // Try finding by name match
                 const { data: doctors } = await sb.from('doctors').select('*');
                 if (doctors && doctors.length > 0) {
-                    // Link first unlinked doctor or create new entry
                     const unlinked = doctors.find(d => !d.user_id);
                     if (unlinked) {
                         await sb.from('doctors').update({ user_id: data.user.id }).eq('id', unlinked.id);
                         doctor = unlinked;
                     } else {
-                        // Create new doctor record
                         const { data: newDoc } = await sb.from('doctors').insert({
                             user_id: data.user.id, name: profile.full_name,
                             specialty: 'General', hospital: 'MediLink Hospital'
@@ -238,23 +315,22 @@
                 return;
             }
 
+            // Save doctor session for future profile page visits
+            activeDoctor = doctor;
+            activeDoctorProfile = profile;
+
             // Link this patient to the doctor
             const linked = await linkPatientToDoctor(doctor.id, currentPatientId);
 
-            // Sign out the doctor (this is just a quick action on profile page)
-            await sb.auth.signOut();
+            // Show success — doctor stays logged in
+            document.getElementById('doctorLoginFields').classList.add('hidden');
+            document.getElementById('doctorLinked').classList.remove('hidden');
+            document.getElementById('doctorLinked').style.display = 'flex';
 
             if (linked) {
-                document.getElementById('doctorLoginFields').classList.add('hidden');
-                document.getElementById('doctorLinked').classList.remove('hidden');
-                document.getElementById('doctorLinked').style.display = 'flex';
                 document.getElementById('linkedMsg').textContent = `✓ ${currentPatient.name || 'Patient'} linked to Dr. ${doctor.name}'s dashboard!`;
-                showToast('Patient linked to your dashboard!', 'success');
+                showToast('Patient linked! You stay logged in for future scans.', 'success');
             } else {
-                // Patient might already be linked
-                document.getElementById('doctorLoginFields').classList.add('hidden');
-                document.getElementById('doctorLinked').classList.remove('hidden');
-                document.getElementById('doctorLinked').style.display = 'flex';
                 document.getElementById('linkedMsg').textContent = `Patient already in your dashboard`;
                 showToast('Patient already linked!', 'info');
             }
