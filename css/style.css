@@ -133,12 +133,30 @@ select.input { appearance: none; background-image: url("data:image/svg+xml,%3Csv
     .sidebar { display: none; }
     .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
     .hide-mobile { display: none; }
+    .mobile-nav { display: flex !important; }
 }
 @media (max-width: 640px) {
     .text-5xl { font-size: 2rem; } .text-4xl { font-size: 1.5rem; } .text-3xl { font-size: 1.25rem; }
     .p-10 { padding: 1.5rem; } .p-8 { padding: 1.25rem; }
     .navbar { padding: .75rem 1rem; }
+    .navbar .logo { font-size: 1rem; }
+    .table th, .table td { padding: .75rem 1rem; font-size: .75rem; }
+    .stat-card .stat-value { font-size: 1.75rem; }
+    .health-card { padding: 1.5rem; border-radius: 1.25rem; }
+    .modal { padding: 1.5rem; border-radius: 1.25rem; margin: 1rem; }
+    .container { padding: 0 1rem; }
+    .btn { font-size: .6rem; padding: .7rem 1.2rem; }
+    .btn-sm { padding: .4rem .75rem; }
+    .doctor-login-bar { flex-direction: column; gap: .5rem; padding: .75rem; }
+    .doctor-login-bar > div { flex-wrap: wrap; }
 }
+
+/* ---- MOBILE BOTTOM NAV ---- */
+.mobile-nav { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid var(--emerald-100); padding: .5rem 0; z-index: 50; box-shadow: 0 -2px 10px rgb(0 0 0/.06); }
+.mobile-nav-inner { display: flex; justify-content: space-around; align-items: center; }
+.mobile-nav-btn { display: flex; flex-direction: column; align-items: center; gap: .2rem; padding: .4rem .75rem; border: none; background: none; cursor: pointer; color: var(--slate-400); font-family: inherit; font-size: .55rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; transition: color .2s; border-radius: .75rem; }
+.mobile-nav-btn.active { color: var(--emerald-600); }
+.mobile-nav-btn svg { width: 20px; height: 20px; }
 
 /* ---- SCROLLBAR ---- */
 ::-webkit-scrollbar { width: 6px; }

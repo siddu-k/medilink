@@ -91,6 +91,25 @@
                                 class="btn btn-primary">Open</button>
                         </div>
                     </div>
+
+                    <!-- NFC Card Management -->
+                    <div class="card p-6">
+                        <h3 class="font-black text-slate-900 mb-4 uppercase text-sm">NFC Card Management</h3>
+                        <div class="flex flex-col gap-3">
+                            <div>
+                                <label class="label">Write Patient to NFC Card</label>
+                                <div class="flex gap-2">
+                                    <input type="text" id="nfcWriteId" class="input flex-1" placeholder="Patient ID (e.g. ML-2024-001)">
+                                    <button onclick="writePatientToNFC()" class="btn btn-primary btn-sm" id="btnWriteNfc">Write</button>
+                                </div>
+                            </div>
+                            <button onclick="eraseNFC()" class="btn btn-danger w-full" id="btnEraseNfc">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                                Erase NFC Card
+                            </button>
+                            <p id="nfcManageStatus" class="text-sm font-bold text-slate-500 hidden"></p>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Active Patient view (Hidden until loaded) -->
@@ -214,6 +233,7 @@
             document.getElementById('apId').textContent = 'ID: ' + p.id;
             document.getElementById('apPhoto').src = p.photo;
             document.getElementById('activePatientPanel').classList.remove('hidden');
+            document.getElementById('nfcWriteId').value = p.id;
             showToast('Patient loaded', 'success');
         }
 
@@ -277,7 +297,6 @@
                     for (const record of event.message.records) {
                         try {
                             const data = decoder.decode(record.data);
-                            // Looking for URL: ...profile.html?id=ML-2024-001 or JSON {id:...}
                             let patientId = null;
                             if (data.includes('profile')) {
                                 const url = new URL(data);
@@ -301,6 +320,70 @@
                 status.className = 'text-sm font-bold text-rose-500 mt-1';
                 status.textContent = '❌ Error: ' + err.message;
             }
+        }
+
+        // Write a patient profile URL to NFC card
+        async function writePatientToNFC() {
+            const patientId = document.getElementById('nfcWriteId').value.trim();
+            const status = document.getElementById('nfcManageStatus');
+            status.classList.remove('hidden');
+
+            if (!patientId) { showToast('Enter a Patient ID', 'error'); return; }
+
+            if (!('NDEFReader' in window)) {
+                status.className = 'text-sm font-bold text-rose-500';
+                status.textContent = '❌ NFC not supported on this device/browser.';
+                return;
+            }
+
+            const btn = document.getElementById('btnWriteNfc');
+            btn.textContent = 'Tap card...'; btn.disabled = true;
+            status.className = 'text-sm font-bold text-blue-500';
+            status.textContent = '⏳ Hold NFC card near device...';
+
+            try {
+                const profileUrl = window.location.origin + window.location.pathname.replace('hospital.html', 'profile.html?id=' + encodeURIComponent(patientId));
+                const ndef = new NDEFReader();
+                await ndef.write({
+                    records: [{ recordType: "url", data: profileUrl }]
+                });
+                status.className = 'text-sm font-bold text-emerald-600';
+                status.textContent = '✅ Patient ' + patientId + ' written to NFC card!';
+                showToast('NFC card written successfully!', 'success');
+            } catch (err) {
+                status.className = 'text-sm font-bold text-rose-500';
+                status.textContent = '❌ Error: ' + err.message;
+            }
+            btn.textContent = 'Write'; btn.disabled = false;
+        }
+
+        // Erase NFC card by writing an empty record
+        async function eraseNFC() {
+            const status = document.getElementById('nfcManageStatus');
+            status.classList.remove('hidden');
+
+            if (!('NDEFReader' in window)) {
+                status.className = 'text-sm font-bold text-rose-500';
+                status.textContent = '❌ NFC not supported on this device/browser.';
+                return;
+            }
+
+            const btn = document.getElementById('btnEraseNfc');
+            btn.textContent = 'Tap card...'; btn.disabled = true;
+            status.className = 'text-sm font-bold text-blue-500';
+            status.textContent = '⏳ Hold NFC card near device to erase...';
+
+            try {
+                const ndef = new NDEFReader();
+                await ndef.write({ records: [{ recordType: "text", data: "" }] });
+                status.className = 'text-sm font-bold text-emerald-600';
+                status.textContent = '✅ NFC card erased successfully!';
+                showToast('NFC card erased!', 'success');
+            } catch (err) {
+                status.className = 'text-sm font-bold text-rose-500';
+                status.textContent = '❌ Error: ' + err.message;
+            }
+            btn.textContent = 'Erase NFC Card'; btn.disabled = false;
         }
 
         init();

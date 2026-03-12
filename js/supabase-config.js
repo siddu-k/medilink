@@ -178,6 +178,40 @@ async function findPatientByUserId(userId) {
     } catch { return null; }
 }
 
+// Generate next patient ID (ML-YYYY-NNN)
+async function generatePatientId() {
+    const sb = getSupabase();
+    const year = new Date().getFullYear();
+    const prefix = `ML-${year}-`;
+    if (sb) {
+        try {
+            const { data } = await sb.from('patients').select('id').like('id', `${prefix}%`).order('id', { ascending: false }).limit(1);
+            if (data && data.length > 0) {
+                const lastNum = parseInt(data[0].id.split('-').pop(), 10);
+                return prefix + String(lastNum + 1).padStart(3, '0');
+            }
+        } catch {}
+    }
+    return prefix + String(Math.floor(Math.random() * 900) + 100).padStart(3, '0');
+}
+
+// Create patient record in DB
+async function createPatientRecord(userId, profile) {
+    const sb = getSupabase();
+    if (!sb) return null;
+    const id = await generatePatientId();
+    try {
+        const { data, error } = await sb.from('patients').insert({
+            id,
+            user_id: userId,
+            name: profile.full_name,
+            email: profile.email,
+            photo: 'https://ui-avatars.com/api/?name=' + encodeURIComponent(profile.full_name) + '&background=059669&color=fff'
+        }).select().single();
+        return error ? null : data;
+    } catch { return null; }
+}
+
 // ===== FALLBACK DATA (used when Supabase isn't set up yet) =====
 function getFallbackPatients() {
     return [
