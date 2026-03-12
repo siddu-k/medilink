@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patient Profile - MediLink</title>
+    <meta name="description" content="View patient medical profile via NFC card scan">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/supabase-config.js"></script>
+    <script src="js/auth.js"></script>
+</head>
+
+<body style="background:var(--emerald-50)">
+    <!-- Doctor Quick Login Bar -->
+    <div class="doctor-login-bar" id="doctorBar">
+        <div style="display:flex;align-items:center;gap:.5rem">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path
+                    d="M4.8 2.3A.3.3 0 105 2H4a2 2 0 00-2 2v5a6 6 0 006 6v0a6 6 0 006-6V4a2 2 0 00-2-2h-1a.2.2 0 10.3.3" />
+                <path d="M8 15v1a6 6 0 006 6v0a6 6 0 006-6v-4" />
+                <circle cx="20" cy="10" r="2" />
+            </svg>
+            <span style="font-weight:700;font-size:.85rem">Doctor?</span>
+            <span style="font-size:.75rem;opacity:.8">Login to add this patient to your dashboard</span>
+        </div>
+        <div style="display:flex;gap:.5rem;align-items:center" id="doctorLoginFields">
+            <input type="email" id="docEmail" placeholder="Email" class="input" style="width:12rem">
+            <input type="password" id="docPassword" placeholder="Password" class="input" style="width:8rem">
+            <button onclick="handleDoctorLogin()" class="btn" id="docLoginBtn">Login & Link</button>
+        </div>
+        <div id="doctorLinked" class="hidden" style="display:flex;align-items:center;gap:.5rem">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="3">
+                <path d="M20 6L9 17l-5-5" />
+            </svg>
+            <span style="font-weight:700;font-size:.85rem" id="linkedMsg">Patient linked to your dashboard!</span>
+        </div>
+    </div>
+
+    <!-- Patient Profile -->
+    <div id="profileContent" class="container" style="padding:2rem 1.5rem;max-width:60rem">
+        <div class="loading-screen" id="loadingScreen">
+            <div class="spinner"></div>
+            <p class="text-slate-500 font-bold">Loading patient profile...</p>
+        </div>
+    </div>
+
+    <script>
+        let currentPatientId = null;
+        let currentPatient = null;
+        let currentReports = [];
+
+        async function init() {
+            // Get patient ID from URL: profile.html?id=ML-2024-001
+            const params = new URLSearchParams(window.location.search);
+            currentPatientId = params.get('id');
+
+            if (!currentPatientId) {
+                document.getElementById('profileContent').innerHTML = `
+                    <div class="card p-10 text-center anim-fade" style="max-width:30rem;margin:4rem auto">
+                        <div style="width:4rem;height:4rem;background:var(--rose-100);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--rose-500)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                        </div>
+                        <h2 class="text-2xl font-black text-slate-900 mb-2">No Patient ID</h2>
+                        <p class="text-slate-500">Please scan an NFC card or use a valid profile link.</p>
+                        <a href="index.html" class="btn btn-primary mt-6" style="text-decoration:none;display:inline-flex">Go to Login</a>
+                    </div>`;
+                return;
+            }
+
+            await waitForSupabase();
+            currentPatient = await fetchPatient(currentPatientId);
+            currentReports = await fetchReports(currentPatientId);
+
+            if (!currentPatient) {
+                document.getElementById('profileContent').innerHTML = `
+                    <div class="card p-10 text-center anim-fade" style="max-width:30rem;margin:4rem auto">
+                        <h2 class="text-2xl font-black text-slate-900 mb-2">Patient Not Found</h2>
+                        <p class="text-slate-500">ID: ${currentPatientId} was not found in the system.</p>
+                        <a href="index.html" class="btn btn-primary mt-6" style="text-decoration:none;display:inline-flex">Go to Login</a>
+                    </div>`;
+                return;
+            }
+
+            renderProfile();
+        }
+
+        function renderProfile() {
+            const p = currentPatient;
+            const bg = p.blood_group || p.bloodGroup || 'N/A';
+            const allergies = p.allergies || [];
+            const emergency = p.emergency_contact || p.emergencyContact || 'N/A';
+
+            // Group reports by hospital
+            const byHospital = {};
+            currentReports.forEach(r => {
+                const h = r.hospital || 'Unknown';
+                if (!byHospital[h]) byHospital[h] = [];
+                byHospital[h].push(r);
+            });
+
+            document.getElementById('profileContent').innerHTML = `
+                <!-- Header card -->
+                <div class="card p-10 anim-scale mb-8" style="background:linear-gradient(135deg,#fff,var(--emerald-50))">
+                    <div style="display:flex;align-items:center;gap:2rem;flex-wrap:wrap">
+                        <div style="position:relative">
+                            <img src="${p.photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(p.name) + '&size=192&background=059669&color=fff'}" 
+                                 style="width:10rem;height:10rem;border-radius:2rem;object-fit:cover;border:6px solid var(--emerald-100);box-shadow:0 10px 30px rgba(0,0,0,.1)" class="anim-float" alt="${p.name}">
+                            <div style="position:absolute;bottom:-.5rem;right:-.5rem;background:var(--emerald-500);padding:.6rem;border-radius:1rem;color:#fff;border:3px solid #fff;box-shadow:0 4px 12px rgba(5,150,105,.3)">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
+                            </div>
+                        </div>
+                        <div style="flex:1">
+                            <h1 class="text-4xl font-black text-slate-900 tracking-tight">${p.name}</h1>
+                            <p class="text-slate-400 font-bold uppercase" style="font-size:.7rem;letter-spacing:.1em;margin-top:.5rem">Health ID: ${p.id}</p>
+                            <div style="display:flex;gap:2rem;margin-top:1.5rem;flex-wrap:wrap">
+                                <div><span style="font-size:.6rem;font-weight:800;color:var(--slate-400);text-transform:uppercase;display:block">Blood Group</span><span class="text-2xl font-black text-emerald">${bg}</span></div>
+                                <div><span style="font-size:.6rem;font-weight:800;color:var(--slate-400);text-transform:uppercase;display:block">Age</span><span class="text-2xl font-black">${p.age || 'N/A'}</span></div>
+                                <div><span style="font-size:.6rem;font-weight:800;color:var(--slate-400);text-transform:uppercase;display:block">Reports</span><span class="text-2xl font-black text-blue">${currentReports.length}</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Contact & Emergency -->
+                <div class="grid grid-2 gap-6 mb-8">
+                    <div class="card p-6 anim-fade">
+                        <h3 class="font-black uppercase text-slate-900 mb-4" style="font-size:.75rem;letter-spacing:.08em">Contact Information</h3>
+                        <div style="display:flex;flex-direction:column;gap:.75rem">
+                            <div style="display:flex;align-items:center;gap:.75rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--emerald-500)" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg><span class="font-bold text-sm">${p.phone || 'N/A'}</span></div>
+                            <div style="display:flex;align-items:center;gap:.75rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--emerald-500)" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,7 12,13 2,7"/></svg><span class="font-bold text-sm">${p.email || 'N/A'}</span></div>
+                        </div>
+                    </div>
+                    <div class="card p-6 anim-fade" style="animation-delay:.1s">
+                        <h3 class="font-black uppercase text-slate-900 mb-4" style="font-size:.75rem;letter-spacing:.08em">Health Alerts</h3>
+                        <div style="display:flex;flex-direction:column;gap:.75rem">
+                            <div><span style="font-size:.6rem;font-weight:800;color:var(--slate-400);text-transform:uppercase">Allergies</span><div style="display:flex;gap:.4rem;margin-top:.4rem;flex-wrap:wrap">${(allergies.length > 0 ? allergies : ['None']).map(a => `<span class="badge badge-red">${a}</span>`).join('')}</div></div>
+                            <div><span style="font-size:.6rem;font-weight:800;color:var(--slate-400);text-transform:uppercase">Emergency Contact</span><p class="font-bold text-sm" style="margin-top:.3rem">${emergency}</p></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Medical Reports by Hospital -->
+                <h2 class="text-2xl font-black text-slate-900 tracking-tight mb-6 uppercase">Medical Records</h2>
+                ${Object.keys(byHospital).length > 0 ? Object.entries(byHospital).map(([hospital, reports], idx) => `
+                    <div class="card mb-4 anim-fade" style="animation-delay:${idx * .08}s;overflow:hidden">
+                        <button onclick="this.nextElementSibling.classList.toggle('hidden');this.querySelector('.chevron').style.transform=this.nextElementSibling.classList.contains('hidden')?'':'rotate(180deg)'" 
+                                style="width:100%;padding:1.25rem 1.5rem;display:flex;align-items:center;justify-content:space-between;background:none;border:none;cursor:pointer;font-family:inherit">
+                            <div style="display:flex;align-items:center;gap:1rem">
+                                <div style="padding:.6rem;background:var(--emerald-50);border-radius:.75rem;color:var(--emerald-600)">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 22V4a2 2 0 012-2h8a2 2 0 012 2v18Z"/><path d="M6 12H4a2 2 0 00-2 2v6a2 2 0 002 2h2"/><path d="M18 9h2a2 2 0 012 2v9a2 2 0 01-2 2h-2"/></svg>
+                                </div>
+                                <div style="text-align:left"><div class="font-black text-lg text-slate-900">${hospital}</div><div style="font-size:.7rem;font-weight:700;color:var(--slate-400);text-transform:uppercase">${reports.length} Reports</div></div>
+                            </div>
+                            <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--slate-400)" stroke-width="2" style="transition:transform .2s"><path d="M6 9l6 6 6-6"/></svg>
+                        </button>
+                        <div class="hidden" style="padding:0 1.5rem 1.5rem;display:flex;flex-direction:column;gap:.75rem">
+                            ${reports.map(r => `
+                                <div class="card" style="padding:1rem 1.25rem;border-left:4px solid var(--emerald-500);display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+                                    <div style="flex:1">
+                                        <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem">
+                                            <span class="font-bold text-slate-900">${r.type}</span>
+                                            <span class="badge ${r.status === 'Normal' || r.status === 'Negative' ? 'badge-green' : r.status === 'Critical' ? 'badge-red' : 'badge-amber'}">${r.status || 'Pending'}</span>
+                                        </div>
+                                        <div style="display:flex;gap:1rem;font-size:.75rem;color:var(--slate-400);font-weight:700">
+                                            <span>📅 ${r.date}</span>
+                                            <span>👨‍⚕️ ${r.doctor}</span>
+                                        </div>
+                                        ${r.metric ? `<p style="font-size:.75rem;font-weight:800;color:var(--emerald-600);margin-top:.4rem">${r.metric}: <span class="text-slate-900">${r.value}</span></p>` : ''}
+                                    </div>
+                                    ${r.file_url || r.fileUrl ? `<button onclick="window.open('${r.file_url || r.fileUrl}','_blank')" class="btn btn-primary btn-sm">View</button>` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `).join('') : '<div class="card p-8 text-center"><p class="text-slate-500 font-bold">No medical records found.</p></div>'}
+
+                <!-- Footer -->
+                <div class="text-center mt-8">
+                    <a href="index.html" style="color:var(--emerald-600);font-weight:700;text-decoration:none;font-size:.85rem">← Back to MediLink Login</a>
+                </div>
+            `;
+        }
+
+        // Doctor Quick Login on profile page
+        async function handleDoctorLogin() {
+            const email = document.getElementById('docEmail').value;
+            const password = document.getElementById('docPassword').value;
+            if (!email || !password) { showToast('Enter your email and password', 'error'); return; }
+
+            const btn = document.getElementById('docLoginBtn');
+            btn.textContent = 'Linking...'; btn.disabled = true;
+
+            const sb = await waitForSupabase();
+            if (!sb) { showToast('Service unavailable', 'error'); btn.textContent = 'Login & Link'; btn.disabled = false; return; }
+
+            // Login the doctor
+            const { data, error } = await sb.auth.signInWithPassword({ email, password });
+            if (error) { showToast(error.message, 'error'); btn.textContent = 'Login & Link'; btn.disabled = false; return; }
+
+            // Check role is doctor
+            const { data: profile } = await sb.from('profiles').select('*').eq('id', data.user.id).single();
+            if (!profile || profile.role !== 'doctor') {
+                showToast('This account is not a doctor account', 'error');
+                await sb.auth.signOut();
+                btn.textContent = 'Login & Link'; btn.disabled = false;
+                return;
+            }
+
+            // Find doctor record
+            let doctor = await findDoctorByUserId(data.user.id);
+
+            // If no doctor record linked to this user, try to create/find by name
+            if (!doctor) {
+                // Try finding by name match
+                const { data: doctors } = await sb.from('doctors').select('*');
+                if (doctors && doctors.length > 0) {
+                    // Link first unlinked doctor or create new entry
+                    const unlinked = doctors.find(d => !d.user_id);
+                    if (unlinked) {
+                        await sb.from('doctors').update({ user_id: data.user.id }).eq('id', unlinked.id);
+                        doctor = unlinked;
+                    } else {
+                        // Create new doctor record
+                        const { data: newDoc } = await sb.from('doctors').insert({
+                            user_id: data.user.id, name: profile.full_name,
+                            specialty: 'General', hospital: 'MediLink Hospital'
+                        }).select().single();
+                        doctor = newDoc;
+                    }
+                }
+            }
+
+            if (!doctor) {
+                showToast('Could not find doctor record', 'error');
+                btn.textContent = 'Login & Link'; btn.disabled = false;
+                return;
+            }
+
+            // Link this patient to the doctor
+            const linked = await linkPatientToDoctor(doctor.id, currentPatientId);
+
+            // Sign out the doctor (this is just a quick action on profile page)
+            await sb.auth.signOut();
+
+            if (linked) {
+                document.getElementById('doctorLoginFields').classList.add('hidden');
+                document.getElementById('doctorLinked').classList.remove('hidden');
+                document.getElementById('doctorLinked').style.display = 'flex';
+                document.getElementById('linkedMsg').textContent = `✓ ${currentPatient.name || 'Patient'} linked to Dr. ${doctor.name}'s dashboard!`;
+                showToast('Patient linked to your dashboard!', 'success');
+            } else {
+                // Patient might already be linked
+                document.getElementById('doctorLoginFields').classList.add('hidden');
+                document.getElementById('doctorLinked').classList.remove('hidden');
+                document.getElementById('doctorLinked').style.display = 'flex';
+                document.getElementById('linkedMsg').textContent = `Patient already in your dashboard`;
+                showToast('Patient already linked!', 'info');
+            }
+        }
+
+        // Initialize
+        init();
+    </script>
+</body>
+
+</html>

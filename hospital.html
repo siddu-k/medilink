@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hospital Dashboard - MediLink</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/supabase-config.js"></script>
+    <script src="js/auth.js"></script>
+</head>
+
+<body style="background:var(--slate-50)">
+    <div class="navbar items-center justify-between" style="border-bottom-color:var(--slate-200)">
+        <div class="logo">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path
+                    d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0016.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 002 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+                <path
+                    d="M12 5L9.04 7.96a2.17 2.17 0 000 3.08c.82.82 2.13.85 3 .07l2.07-1.9a2.82 2.82 0 013.79 0l2.96 2.66" />
+                <path d="M18 15l-2-2" />
+                <path d="M15 18l-2-2" />
+            </svg>
+            MediLink Hospital Portal
+        </div>
+        <div id="userNav"></div>
+    </div>
+
+    <div class="container mt-8" style="max-width:70rem">
+        <div class="card p-4 flex gap-2 mb-8" style="background:var(--slate-100);border:0;border-radius:1rem">
+            <button class="btn flex-1 bg-white" id="tabRegistry" onclick="switchView('registry')"
+                style="color:var(--slate-900);box-shadow:0 2px 8px rgb(0 0 0/.05)">Patient Registry</button>
+            <button class="btn flex-1 btn-outline" id="tabNew" onclick="switchView('new')"
+                style="border:0;color:var(--slate-500)">New Entry / Scan</button>
+        </div>
+
+        <div id="viewRegistry" class="anim-fade">
+            <h2 class="text-2xl font-black text-slate-900 mb-6">Patient Registry</h2>
+            <div class="card overflow-x-auto">
+                <table class="table" id="registryTable">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Blood Group</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="registryBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="viewNew" class="anim-fade hidden">
+            <div class="grid grid-2 gap-8 items-start">
+
+                <!-- Scan Options -->
+                <div class="flex flex-col gap-4">
+                    <h2 class="text-2xl font-black text-slate-900">Patient Access</h2>
+
+                    <button class="card p-8 text-center"
+                        style="cursor:pointer;background:var(--emerald-50);border-color:var(--emerald-200);transition:all .2s"
+                        onclick="scanNFC()">
+                        <div
+                            style="width:4rem;height:4rem;background:var(--emerald-100);color:var(--emerald-600);border-radius:1rem;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path
+                                    d="M4.8 2.3A.3.3 0 105 2H4a2 2 0 00-2 2v5a6 6 0 006 6v0a6 6 0 006-6V4a2 2 0 00-2-2h-1a.2.2 0 10.3.3" />
+                                <path d="M8 15v1a6 6 0 006 6v0a6 6 0 006-6v-4" />
+                                <circle cx="20" cy="10" r="2" />
+                            </svg>
+                        </div>
+                        <h3 class="font-black text-lg">Tap NFC Card</h3>
+                        <p class="text-slate-500 text-sm mt-1" id="nfcReadStatus">Scan health card to access profile</p>
+                    </button>
+
+                    <div style="position:relative;text-align:center;margin:1rem 0">
+                        <div style="position:absolute;top:50%;left:0;right:0;border-top:1px solid var(--slate-200)">
+                        </div>
+                        <span
+                            style="background:var(--slate-50);padding:0 1rem;position:relative;color:var(--slate-400);font-weight:800;font-size:.7rem;text-transform:uppercase">OR</span>
+                    </div>
+
+                    <div class="card p-6">
+                        <label class="label">Manual Entry (Patient ID)</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="manualId" class="input flex-1" placeholder="e.g. ML-2024-001">
+                            <button onclick="loadPatient(document.getElementById('manualId').value)"
+                                class="btn btn-primary">Open</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Active Patient view (Hidden until loaded) -->
+                <div id="activePatientPanel" class="card p-8 border-emerald-200 hidden bg-gradient-emerald">
+                    <div class="flex items-center gap-4 mb-8 pb-8" style="border-bottom:1px solid var(--emerald-100)">
+                        <img id="apPhoto" src="" style="width:4rem;height:4rem;border-radius:1rem;object-fit:cover"
+                            class="bg-white">
+                        <div>
+                            <h3 id="apName" class="text-2xl font-black text-slate-900">...</h3>
+                            <p id="apId" class="text-emerald font-bold tracking-wide">...</p>
+                        </div>
+                    </div>
+
+                    <h4 class="font-black text-slate-900 mb-4 uppercase text-sm">Add New Medical Entry</h4>
+                    <div class="flex flex-col gap-4">
+                        <div class="grid grid-2 gap-4">
+                            <div><label class="label">Test Type</label><input type="text" id="ntType" class="input"
+                                    placeholder="e.g. Blood Test"></div>
+                            <div><label class="label">Test Date</label><input type="date" id="ntDate" class="input">
+                            </div>
+                        </div>
+                        <div class="grid grid-2 gap-4">
+                            <div>
+                                <label class="label">Status</label>
+                                <select id="ntStatus" class="input">
+                                    <option>Normal</option>
+                                    <option>Review</option>
+                                    <option>Critical</option>
+                                </select>
+                            </div>
+                            <div><label class="label">Doctor Name</label><input type="text" id="ntDoc" class="input"
+                                    placeholder="Attending Doctor"></div>
+                        </div>
+                        <div>
+                            <label class="label">Metric & Value (Optional)</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="ntMetric" class="input" placeholder="e.g. Hemoglobin">
+                                <input type="text" id="ntValue" class="input" placeholder="e.g. 14.2 g/dL">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="label">Upload File (PDF/Image)</label>
+                            <input type="file" id="ntFile" class="input p-2" accept=".pdf,image/*">
+                        </div>
+                        <button onclick="submitEntry()" class="btn btn-primary mt-2" id="submitEntryBtn">Save
+                            Entry</button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+        let allPatients = [];
+        let activePatient = null;
+        let hospitalName = '';
+
+        async function init() {
+            currentUser = await requireAuth(['hospital']);
+            if (!currentUser) return;
+            hospitalName = currentUser.profile.full_name || 'MediLink Hospital';
+
+            renderUserNav(currentUser.profile, 'userNav');
+            document.getElementById('ntDate').valueAsDate = new Date();
+            document.getElementById('ntDoc').value = 'Dr. Staff';
+
+            allPatients = await fetchPatients();
+            renderRegistry();
+        }
+
+        function switchView(view) {
+            document.getElementById('viewRegistry').classList.add('hidden');
+            document.getElementById('viewNew').classList.add('hidden');
+            document.getElementById('tabRegistry').className = 'btn flex-1 btn-outline';
+            document.getElementById('tabNew').className = 'btn flex-1 btn-outline';
+
+            document.getElementById('tabRegistry').style.border = '0';
+            document.getElementById('tabNew').style.border = '0';
+            document.getElementById('tabRegistry').style.color = 'var(--slate-500)';
+            document.getElementById('tabNew').style.color = 'var(--slate-500)';
+            document.getElementById('tabRegistry').style.background = 'transparent';
+            document.getElementById('tabNew').style.background = 'transparent';
+            document.getElementById('tabRegistry').style.boxShadow = 'none';
+            document.getElementById('tabNew').style.boxShadow = 'none';
+
+            if (view === 'registry') {
+                document.getElementById('viewRegistry').classList.remove('hidden');
+                document.getElementById('tabRegistry').className = 'btn flex-1 bg-white';
+                document.getElementById('tabRegistry').style.color = 'var(--slate-900)';
+                document.getElementById('tabRegistry').style.boxShadow = '0 2px 8px rgb(0 0 0/.05)';
+            } else {
+                document.getElementById('viewNew').classList.remove('hidden');
+                document.getElementById('tabNew').className = 'btn flex-1 bg-white';
+                document.getElementById('tabNew').style.color = 'var(--slate-900)';
+                document.getElementById('tabNew').style.boxShadow = '0 2px 8px rgb(0 0 0/.05)';
+            }
+        }
+
+        function renderRegistry() {
+            document.getElementById('registryBody').innerHTML = allPatients.map(p => `
+                <tr>
+                    <td class="font-bold text-emerald">${p.id}</td>
+                    <td class="font-black text-slate-900">${p.name}</td>
+                    <td class="font-bold text-slate-500">${p.blood_group || '-'}</td>
+                    <td>
+                        <button class="btn btn-outline btn-sm" onclick="loadPatient('${p.id}');switchView('new')">Manage</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function loadPatient(id) {
+            if (!id) return;
+            const p = allPatients.find(x => x.id === id) || await fetchPatient(id);
+            if (!p) { showToast('Patient not found', 'error'); return; }
+
+            activePatient = p;
+            document.getElementById('apName').textContent = p.name;
+            document.getElementById('apId').textContent = 'ID: ' + p.id;
+            document.getElementById('apPhoto').src = p.photo;
+            document.getElementById('activePatientPanel').classList.remove('hidden');
+            showToast('Patient loaded', 'success');
+        }
+
+        async function submitEntry() {
+            if (!activePatient) return;
+            const type = document.getElementById('ntType').value;
+            const date = document.getElementById('ntDate').value;
+            if (!type || !date) { showToast('Type and Date are required', 'error'); return; }
+
+            const btn = document.getElementById('submitEntryBtn');
+            btn.textContent = 'Uploading...'; btn.disabled = true;
+
+            let fileUrl = null;
+            const fileInput = document.getElementById('ntFile');
+            if (fileInput.files.length > 0) {
+                fileUrl = await uploadMedicalFile(fileInput.files[0], activePatient.id);
+            }
+
+            const report = {
+                type, date, hospital: hospitalName,
+                doctor: document.getElementById('ntDoc').value,
+                status: document.getElementById('ntStatus').value,
+                metric: document.getElementById('ntMetric').value,
+                value: document.getElementById('ntValue').value,
+                file_url: fileUrl
+            };
+
+            const success = await saveReport(activePatient.id, report);
+            if (success) {
+                showToast('Entry saved successfully!', 'success');
+                // Reset form
+                document.getElementById('ntType').value = '';
+                document.getElementById('ntMetric').value = '';
+                document.getElementById('ntValue').value = '';
+                fileInput.value = '';
+                document.getElementById('activePatientPanel').classList.add('hidden');
+                activePatient = null;
+            } else {
+                showToast('Failed to save entry', 'error');
+            }
+
+            btn.textContent = 'Save Entry'; btn.disabled = false;
+        }
+
+        async function scanNFC() {
+            const status = document.getElementById('nfcReadStatus');
+            if (!('NDEFReader' in window)) {
+                status.className = 'text-sm font-bold text-rose-500 mt-1';
+                status.textContent = '❌ NFC not supported on this device/browser.';
+                return;
+            }
+            try {
+                status.className = 'text-sm font-bold text-blue-500 mt-1';
+                status.textContent = '⏳ Waiting for card scan...';
+
+                const ndef = new NDEFReader();
+                await ndef.scan();
+
+                ndef.onreading = event => {
+                    const decoder = new TextDecoder();
+                    for (const record of event.message.records) {
+                        try {
+                            const data = decoder.decode(record.data);
+                            // Looking for URL: ...profile.html?id=ML-2024-001 or JSON {id:...}
+                            let patientId = null;
+                            if (data.includes('profile')) {
+                                const url = new URL(data);
+                                patientId = url.searchParams.get('id') || url.searchParams.get('profile');
+                            } else if (data.includes('"id"')) {
+                                const json = JSON.parse(data);
+                                patientId = json.id || json.patientId;
+                            }
+
+                            if (patientId) {
+                                loadPatient(patientId);
+                                status.textContent = '✅ Scan successful';
+                                status.className = 'text-sm font-bold text-emerald-600 mt-1';
+                            } else {
+                                status.textContent = '⚠️ Valid Medilink ID not found on card';
+                            }
+                        } catch (e) { console.error('Parse error', e); }
+                    }
+                };
+            } catch (err) {
+                status.className = 'text-sm font-bold text-rose-500 mt-1';
+                status.textContent = '❌ Error: ' + err.message;
+            }
+        }
+
+        init();
+    </script>
+</body>
+
+</html>
