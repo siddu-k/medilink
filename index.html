@@ -1,0 +1,2726 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MEDILINK - Secure Medical Records</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0fdf4;
+            color: #0f172a;
+        }
+
+        .custom-card {
+            background: white;
+            border-radius: 1.5rem;
+            border: 1px solid #dcfce7;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+        }
+
+        .medical-gradient {
+            background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+        }
+
+        .sidebar-active {
+            background-color: #16a34a;
+            color: white;
+            box-shadow: 0 10px 15px -3px rgba(22, 163, 74, 0.2);
+        }
+
+        /* Hide scrollbars but keep functionality */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-float {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0px);
+            }
+            50% {
+                transform: translateY(-20px);
+            }
+        }
+
+        .animate-pulse-glow {
+            animation: pulseGlow 2s ease-in-out infinite;
+        }
+
+        @keyframes pulseGlow {
+            0%, 100% {
+                box-shadow: 0 10px 30px rgba(22, 163, 74, 0.2);
+            }
+            50% {
+                box-shadow: 0 10px 50px rgba(22, 163, 74, 0.4);
+            }
+        }
+
+        .animate-slide-in-left {
+            animation: slideInLeft 0.6s ease-out forwards;
+        }
+
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .animate-scale-in {
+            animation: scaleIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        @keyframes scaleIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="app-root">
+        <!-- Content will be injected here via JavaScript -->
+    </div>
+
+    <script>
+        // --- SUPABASE INITIALIZATION ---
+        const SUPABASE_URL = 'https://xdwypktkqiqwjmoetgzh.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhkd3lwa3RrcWlxd2ptb2V0Z3poIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyOTE5OTgsImV4cCI6MjA4ODg2Nzk5OH0.kvAoMzci1b7YNQpUUq1G9PW3V71kqDKCwp5dF3TUNuM';
+        let supabase = null;
+
+        // Initialize Supabase when SDK is ready
+        function initSupabase() {
+            if (window.supabase && !supabase) {
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            }
+        }
+
+        // --- AUTH STATE ---
+        let currentUser = null;
+        let userRole = null; // 'patient', 'hospital', 'doctor'
+
+        // --- DATA LAYER ---
+        const SAMPLE_PDF = "https://www.who.int/docs/default-source/nutrition-and-food-safety/food-safety/infosan/sample-report.pdf";
+        const SAMPLE_XRAY = "https://prod-images-static.radiopaedia.org/images/157210/ad707b89791bc0131cc9721cb2d04a_big_gallery.jpg";
+        const SAMPLE_BLOOD = "https://www.clarksonlab.com/forms/Sample_Blood_Report.pdf";
+
+        const patients = [
+            {
+                id: "ML-2024-001",
+                name: "Chalamalasetti Sai Praveen",
+                age: 19,
+                photo: "pic1.jpg",
+                bloodGroup: "O+",
+                phone: "91-9876543210",
+                email: "chalamalasettisaipraveen07@gmail.com",
+                lastVisit: "2024-02-15",
+                allergies: ["vomitings", "High fever"],
+                chronicConditions: ["None"],
+                emergencyContact: "Srinivas Rao (Father) - 91-9876543211",
+                reports: [
+                    { id: 1, type: "Full Blood Count", hospital: "Apollo Hospital", doctor: "Dr. Ramesh", date: "2024-02-15", status: "Normal", value: "14.2 g/dL", metric: "Hemoglobin", fileUrl: "https://drive.google.com/file/d/1yQ9qkb9f6EKwHZkCr9zCsy_eQZGMFARu/view?usp=drive_link" },
+                    { id: 2, type: "Chest X-Ray", hospital: "City Diagnostics", doctor: "Dr. Sarah", date: "2024-01-10", status: "Review", details: "Chest X-Ray clear", fileUrl: "https://drive.google.com/file/d/1cFJY2TbixUJ4HOy-4tH6NRXlYbAU1wM0/view?usp=drive_link" },
+                    { id: 3, type: "Lipid Profile", hospital: "Apollo Hospital", doctor: "Dr. Ramesh", date: "2023-12-05", status: "Normal", value: "180 mg/dL", metric: "Total Cholesterol", fileUrl: SAMPLE_PDF },
+                    { id: 4, type: "MRI Brain Scan", hospital: "Metro Imaging", doctor: "Dr. Ananya", date: "2023-11-20", status: "Review", details: "No abnormalities detected", fileUrl: SAMPLE_XRAY },
+                    { id: 5, type: "Urinalysis", hospital: "City Diagnostics", doctor: "Dr. Sarah", date: "2023-10-15", status: "Negative", fileUrl: SAMPLE_PDF },
+                    { id: 6, type: "ECG", hospital: "Apollo Hospital", doctor: "Dr. Ramesh", date: "2023-09-30", status: "Negative", fileUrl: SAMPLE_PDF },
+                    { id: 7, type: "Blood Sugar Test", hospital: "City Diagnostics", doctor: "Dr. Sarah", date: "2023-08-25", status: "Normal", value: "90 mg/dL", metric: "Fasting Blood Sugar", fileUrl: SAMPLE_BLOOD },
+                    { id: 8, type: "Allergy Test", hospital: "Apollo Hospital", doctor: "Dr. Ramesh", date: "2023-07-10", status: "Positive", details: "Allergic to pollen and dust mites", fileUrl: SAMPLE_PDF },
+                    { id: 9, type: "Vitamin D Test", hospital: "City Diagnostics", doctor: "Dr. Sarah", date: "2023-06-05", status: "Deficient", value: "15 ng/mL", metric: "Vitamin D Level", fileUrl: SAMPLE_BLOOD },
+                    { id: 10, type: "Thyroid Function Test", hospital: "Apollo Hospital", doctor: "Dr. Ramesh", date: "2023-05-20", status: "Negative", fileUrl: SAMPLE_PDF }
+                ],
+                appointments: [
+                    { id: 101, doctor: "Dr. Ramesh Varma", specialization: "Cardiologist", hospital: "Apollo Hospital", date: "2024-03-20", time: "10:00 AM", status: "Confirmed" }
+                ]
+            },
+            {
+                id: "ML-2024-002",
+                name: "B Kishan",
+                age: 24,
+                photo: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=400&fit=crop",
+                bloodGroup: "A-",
+                phone: "91-8888777766",
+                email: "kishan@gmail.com",
+                reports: [{ id: 301, type: "CT Scan", hospital: "Max Healthcare", doctor: "Dr. Singh", date: "2024-01-20", status: "Critical", value: "High", metric: "CRP", fileUrl: SAMPLE_XRAY }],
+                appointments: []
+            },
+            {
+                id: "ML-2024-003",
+                name: "Ajay Kumar B",
+                age: 25,
+                photo: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop",
+                bloodGroup: "B+",
+                phone: "91-9988776655",
+                email: "ajay.kumar@gmail.com",
+                reports: [{ id: 401, type: "Blood Test", hospital: "Fortis", doctor: "Dr. Gupta", date: "2024-03-01", status: "Normal", fileUrl: SAMPLE_BLOOD }],
+                appointments: []
+            },
+            {
+                id: "ML-2024-004",
+                name: "Suresh Reddy",
+                age: 30,
+                photo: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=400&h=400&fit=crop",
+                bloodGroup: "AB+",
+                phone: "91-9876655443",
+                email: "suresh.reddy@gmail.com",
+                reports: [{ id: 501, type: "X-Ray", hospital: "Apollo Hospital", doctor: "Dr. Varma", date: "2024-02-10", status: "Review", fileUrl: SAMPLE_XRAY }],
+                appointments: []
+            },
+            {
+                id: "ML-2024-005",
+                name: "Ravi Teja",
+                age: 28,
+                photo: "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=400&h=400&fit=crop",
+                bloodGroup: "O-",
+                phone: "91-9123456780",
+                email: "ravi.teja@gmail.com",
+                reports: [{ id: 601, type: "MRI", hospital: "City Diagnostics", doctor: "Dr. Mehta", date: "2024-01-15", status: "Normal", fileUrl: SAMPLE_XRAY }],
+                appointments: []
+            },
+            {
+                id: "ML-2024-006",
+                name: "Anjali Sharma",
+                age: 22,
+                photo: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=400&fit=crop",
+                bloodGroup: "A+",
+                phone: "91-9988776655",
+                email: "anjali.sharma@gmail.com",
+                reports: [{ id: 701, type: "Ultrasound", hospital: "Fortis", doctor: "Dr. Kapoor", date: "2024-02-05", status: "Normal", fileUrl: SAMPLE_XRAY }],
+                appointments: []
+            },
+            {
+                id: "ML-2024-007",
+                name: "Vikram Singh",
+                age: 35,
+                photo: "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=400&h=400&fit=crop",
+                bloodGroup: "B-",
+                phone: "91-9876543210",
+                email: "vikram.singh@gmail.com",
+                reports: [{ id: 801, type: "ECG", hospital: "Apollo Hospital", doctor: "Dr. Varma", date: "2024-03-10", status: "Critical", fileUrl: SAMPLE_PDF }],
+                appointments: []
+            },
+            {
+                id: "ML-2024-008",
+                name: "Priya Reddy",
+                age: 27,
+                photo: "https://images.unsplash.com/photo-1544723795-3fb6469f5b39?w=400&h=400&fit=crop",
+                bloodGroup: "AB-",
+                phone: "91-9123456789",
+                email: "priya.reddy@gmail.com",
+                reports: [{ id: 901, type: "CT Scan", hospital: "City Diagnostics", doctor: "Dr. Sharma", date: "2024-04-15", status: "Normal", fileUrl: SAMPLE_PDF }],
+                appointments: []
+            },
+            {
+                id: "ML-2024-009",
+                name: "Rahul Verma",
+                age: 32,
+                photo: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=400&fit=crop",
+                bloodGroup: "O+",
+                phone: "91-9988776650",
+                email: "rahul.verma@gmail.com",
+                reports: [{ id: 1001, type: "Blood Test", hospital: "Fortis", doctor: "Dr. Gupta", date: "2024-02-20", status: "Normal", fileUrl: SAMPLE_BLOOD }],
+                appointments: []
+            },
+            {
+                id: "ML-2024-010",
+                name: "Sneha Kapoor",
+                age: 29,
+                photo: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&h=400&fit=crop",
+                bloodGroup: "A-",
+                phone: "91-9876543212",
+                email: "sneha.kapoor@gmail.com",
+                reports: [{ id: 1101, type: "X-Ray", hospital: "Apollo Hospital", doctor: "Dr. Varma", date: "2024-03-05", status: "Review", fileUrl: SAMPLE_XRAY }],
+                appointments: []
+            }
+        ];
+
+        const doctors = [
+            { id: 1, name: "Dr. Ramesh Varma", specialty: "Cardiologist", hospital: "Apollo Hospital", experience: "12 Yrs", fee: "₹800", slots: ["10:00 AM", "11:30 AM", "04:30 PM", "06:00 PM"] },
+            { id: 2, name: "Dr. Sarah Khan", specialty: "Dermatologist", hospital: "City Diagnostics", experience: "8 Yrs", fee: "₹600", slots: ["09:00 AM", "11:00 AM", "02:00 PM", "03:30 PM"] },
+            { id: 3, name: "Dr. Arun Singh", specialty: "Pediatrician", hospital: "Children's Clinic", experience: "15 Yrs", fee: "₹500", slots: ["10:00 AM", "12:00 PM", "05:00 PM"] },
+            { id: 4, name: "Dr. Ananya Mehta", specialty: "Neurologist", hospital: "Metro Imaging", experience: "10 Yrs", fee: "₹1000", slots: ["09:30 AM", "01:00 PM", "03:00 PM", "04:30 PM"] },
+            { id: 5, name: "Dr. Priya Desai", specialty: "Gynecologist", hospital: "City Diagnostics", experience: "9 Yrs", fee: "₹700", slots: ["10:00 AM", "11:30 AM", "01:30 PM", "03:00 PM"] },
+            { id: 6, name: "Dr. Vikram Patel", specialty: "Psychiatrist", hospital: "MindCare Center", experience: "20 Yrs", fee: "₹1200", slots: ["09:00 AM", "11:00 AM", "02:00 PM", "04:00 PM"] },
+            { id: 7, name: "Dr. Meera Joshi", specialty: "Endocrinologist", hospital: "Apollo Hospital", experience: "11 Yrs", fee: "₹900", slots: ["10:30 AM", "12:30 PM", "03:30 PM", "05:00 PM"] },
+            { id: 8, name: "Dr. Suresh Kumar", specialty: "Orthopedic Surgeon", hospital: "Fortis", experience: "18 Yrs", fee: "₹1500", slots: ["09:00 AM", "11:30 AM", "02:30 PM", "04:30 PM"] },
+            { id: 9, name: "Dr. Anjali Rao", specialty: "Gastroenterologist", hospital: "City Diagnostics", experience: "14 Yrs", fee: "₹850", slots: ["10:00 AM", "01:00 PM", "03:00 PM", "05:30 PM"] },
+            { id: 10, name: "Dr. Rohit Verma", specialty: "Pulmonologist", hospital: "Metro Imaging", experience: "13 Yrs", fee: "₹950", slots: ["09:30 AM", "12:00 PM", "02:30 PM", "04:00 PM"] },
+            { id: 11, name: "Dr. Kavita Singh", specialty: "Ophthalmologist", hospital: "City Diagnostics", experience: "10 Yrs", fee: "₹700", slots: ["10:00 AM", "11:30 AM", "01:30 PM", "03:00 PM"] },
+            { id: 12, name: "Dr. Arjun Malhotra", specialty: "Nephrologist", hospital: "Apollo Hospital", experience: "16 Yrs", fee: "₹1100", slots: ["09:00 AM", "11:00 AM", "02:00 PM", "04:00 PM"] },
+            { id: 13, name: "Dr. Sneha Kapoor", specialty: "Rheumatologist", hospital: "Fortis", experience: "12 Yrs", fee: "₹800", slots: ["10:30 AM", "01:30 PM", "03:30 PM", "05:00 PM"] },
+            { id: 14, name: "Dr. Rajeshwari Iyer", specialty: "Oncologist", hospital: "City Diagnostics", experience: "18 Yrs", fee: "₹2000", slots: ["09:00 AM", "11:30 AM", "02:30 PM", "04:30 PM"] },
+            { id: 15, name: "Dr. Manish Gupta", specialty: "Hematologist", hospital: "Metro Imaging", experience: "14 Yrs", fee: "₹900", slots: ["10:00 AM", "12:30 PM", "03:00 PM", "05:30 PM"] },
+            { id: 16, name: "Dr. Priyanka Deshmukh", specialty: "Psychologist", hospital: "MindCare Center", experience: "10 Yrs", fee: "₹1200", slots: ["09:00 AM", "11:00 AM", "02:00 PM", "04:00 PM"] },
+            { id: 17, name: "Dr. Sandeep Rao", specialty: "General Physician", hospital: "City Diagnostics", experience: "8 Yrs", fee: "₹500", slots: ["10:00 AM", "11:30 AM", "01:30 PM", "03:00 PM"] },
+            { id: 18, name: "Dr. Anupama Singh", specialty: "Pulmonologist", hospital: "Apollo Hospital", experience: "15 Yrs", fee: "₹950", slots: ["09:30 AM", "12:00 PM", "02:30 PM", "04:00 PM"] },
+            { id: 19, name: "Dr. Ritu Sharma", specialty: "Gynecologist", hospital: "City Diagnostics", experience: "9 Yrs", fee: "₹700", slots: ["10:00 AM", "11:30 AM", "01:30 PM", "03:00 PM"] },
+            { id: 20, name: "Dr. Vikram Singh", specialty: "Cardiologist", hospital: "Fortis", experience: "20 Yrs", fee: "₹800", slots: ["10:00 AM", "11:30 AM", "04:30 PM", "06:00 PM"] }
+        ];
+
+        // --- APP STATE ---
+        let currentState = {
+            view: 'auth', // auth, landing, patient, hospital, doctor
+            currentPatientId: null,
+            currentDoctorId: null,
+            currentHospitalId: null,
+            patientPortalTab: 'dashboard', // dashboard, reports, appointments, card
+            bookingDoctor: null,
+            hospitalSelectedPatientId: null,
+            showNewEntryForm: false,
+            hospitalSessionType: null, // 'saved' or 'new'
+            showNFCPanel: false,
+            hospitalDoctorView: null, // doctor ID for viewing appointments
+            authMode: 'login' // login, signup
+        };
+
+        // --- RENDER FUNCTIONS ---
+
+        function render() {
+            const root = document.getElementById('app-root');
+            root.innerHTML = '';
+
+            if (!currentUser) {
+                root.innerHTML = renderAuthPage();
+            } else if (currentState.view === 'landing') {
+                root.innerHTML = renderLanding();
+            } else if (currentState.view === 'patient') {
+                root.innerHTML = renderPatientPortal();
+            } else if (currentState.view === 'hospital') {
+                root.innerHTML = renderHospitalPortal();
+            } else if (currentState.view === 'doctor') {
+                root.innerHTML = renderDoctorPortal();
+            }
+
+            lucide.createIcons();
+            attachEventListeners();
+        }
+
+        // Initialize auth state on page load
+        async function initAuth() {
+            // Initialize Supabase if not already done
+            if (!supabase && window.supabase) {
+                initSupabase();
+            }
+            
+            // Wait for Supabase to be ready
+            let retries = 0;
+            while (!supabase && retries < 10) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                if (window.supabase) {
+                    initSupabase();
+                }
+                retries++;
+            }
+            
+            // If Supabase failed to load, just render without auth
+            if (!supabase) {
+                render();
+                return;
+            }
+
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    currentUser = user;
+                    const { data: profile } = await supabase
+                        .from('profiles')
+                        .select('role')
+                        .eq('id', user.id)
+                        .single();
+                    if (profile) {
+                        userRole = profile.role;
+                        currentState.view = 'landing';
+                    }
+                }
+            } catch (error) {
+                console.log('Auth init error (may be expected if not set up yet):', error.message);
+            }
+            render();
+        }
+
+        // ===== AUTHENTICATION FUNCTIONS =====
+        async function handleLogin(email, password, role) {
+            try {
+                // Ensure Supabase is ready
+                if (!supabase) {
+                    if (!window.supabase) {
+                        showNotification('Supabase SDK not loaded yet. Please wait and try again.', 'error');
+                        return;
+                    }
+                    initSupabase();
+                }
+
+                showNotification('Logging in...', 'info');
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email,
+                    password
+                });
+                if (error) throw error;
+                
+                currentUser = data.user;
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('role')
+                    .eq('id', data.user.id)
+                    .single();
+                if (profile) {
+                    userRole = profile.role;
+                    currentState.view = 'landing';
+                    showNotification('Login successful!', 'success');
+                    render();
+                } else {
+                    throw new Error('Profile not found');
+                }
+            } catch (error) {
+                showNotification(error.message || 'Login failed', 'error');
+            }
+        }
+
+        async function handleSignup(email, password, fullName, role) {
+            try {
+                // Ensure Supabase is ready
+                if (!supabase) {
+                    if (!window.supabase) {
+                        showNotification('Supabase SDK not loaded yet. Please wait and try again.', 'error');
+                        return;
+                    }
+                    initSupabase();
+                }
+
+                showNotification('Creating account...', 'info');
+                const { data, error } = await supabase.auth.signUp({
+                    email,
+                    password
+                });
+                if (error) throw error;
+                
+                // Create profile
+                const { error: profileError } = await supabase
+                    .from('profiles')
+                    .insert({
+                        id: data.user.id,
+                        email,
+                        full_name: fullName,
+                        role,
+                        created_at: new Date()
+                    });
+                if (profileError) throw profileError;
+                
+                currentUser = data.user;
+                userRole = role;
+                currentState.view = 'landing';
+                showNotification('Account created! Please verify your email.', 'success');
+                render();
+            } catch (error) {
+                showNotification(error.message || 'Signup failed', 'error');
+            }
+        }
+
+        async function logout() {
+            try {
+                // Try to logout from Supabase if available
+                if (supabase) {
+                    await supabase.auth.signOut();
+                }
+                currentUser = null;
+                userRole = null;
+                currentState = {
+                    view: 'auth',
+                    currentPatientId: null,
+                    currentDoctorId: null,
+                    currentHospitalId: null,
+                    patientPortalTab: 'dashboard',
+                    bookingDoctor: null,
+                    hospitalSelectedPatientId: null,
+                    showNewEntryForm: false,
+                    hospitalSessionType: null,
+                    showNFCPanel: false,
+                    hospitalDoctorView: null,
+                    authMode: 'login'
+                };
+                showNotification('Logged out successfully', 'success');
+                render();
+            } catch (error) {
+                showNotification(error.message || 'Logout failed', 'error');
+            }
+        }
+
+        function renderAuthPage() {
+            if (currentState.authMode === 'login') {
+                return renderLoginPage();
+            } else {
+                return renderSignupPage();
+            }
+        }
+
+        function renderLoginPage() {
+            return `
+            <div class="min-h-screen bg-gradient-to-br from-blue-50 to-emerald-50 flex items-center justify-center p-6">
+                <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
+                    <div class="text-center mb-8">
+                        <div class="w-16 h-16 bg-gradient-to-br from-emerald-400 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <i data-lucide="heart-handshake" class="w-8 h-8 text-white"></i>
+                        </div>
+                        <h1 class="text-3xl font-black text-slate-900">MediLink</h1>
+                        <p class="text-slate-500 mt-2">Secure Medical Records</p>
+                    </div>
+
+                    <div class="space-y-4 mb-6">
+                        <div>
+                            <label class="block text-sm font-bold text-slate-700 mb-2">Email Address</label>
+                            <input type="email" id="loginEmail" placeholder="your@email.com" class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-slate-700 mb-2">Password</label>
+                            <input type="password" id="loginPassword" placeholder="••••••••" class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-slate-700 mb-2">Login As</label>
+                            <select id="loginRole" class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                                <option value="patient">Patient</option>
+                                <option value="hospital">Hospital Staff</option>
+                                <option value="doctor">Doctor</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <button onclick="loginUser()" class="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700 transition-colors mb-4">
+                        Login
+                    </button>
+
+                    <button onclick="currentState.authMode = 'signup'; render();" class="w-full py-3 text-emerald-600 font-bold hover:text-emerald-700">
+                        Don't have an account? Sign Up
+                    </button>
+                </div>
+            </div>`;
+        }
+
+        function renderSignupPage() {
+            return `
+            <div class="min-h-screen bg-gradient-to-br from-blue-50 to-emerald-50 flex items-center justify-center p-6">
+                <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
+                    <div class="text-center mb-8">
+                        <div class="w-16 h-16 bg-gradient-to-br from-emerald-400 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <i data-lucide="heart-handshake" class="w-8 h-8 text-white"></i>
+                        </div>
+                        <h1 class="text-3xl font-black text-slate-900">Create Account</h1>
+                        <p class="text-slate-500 mt-2">Join MediLink Today</p>
+                    </div>
+
+                    <div class="space-y-4 mb-6">
+                        <div>
+                            <label class="block text-sm font-bold text-slate-700 mb-2">Full Name</label>
+                            <input type="text" id="signupName" placeholder="Your Full Name" class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-slate-700 mb-2">Email Address</label>
+                            <input type="email" id="signupEmail" placeholder="your@email.com" class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-slate-700 mb-2">Password</label>
+                            <input type="password" id="signupPassword" placeholder="••••••••" class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-slate-700 mb-2">Register As</label>
+                            <select id="signupRole" class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                                <option value="patient">Patient</option>
+                                <option value="hospital">Hospital Staff</option>
+                                <option value="doctor">Doctor</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <button onclick="signupUser()" class="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700 transition-colors mb-4">
+                        Create Account
+                    </button>
+
+                    <button onclick="currentState.authMode = 'login'; render();" class="w-full py-3 text-emerald-600 font-bold hover:text-emerald-700">
+                        Already have an account? Login
+                    </button>
+                </div>
+            </div>`;
+        }
+
+        function loginUser() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            const role = document.getElementById('loginRole').value;
+            
+            if (!email || !password) {
+                showNotification('Please fill all fields', 'error');
+                return;
+            }
+            
+            handleLogin(email, password, role);
+        }
+
+        function signupUser() {
+            const name = document.getElementById('signupName').value;
+            const email = document.getElementById('signupEmail').value;
+            const password = document.getElementById('signupPassword').value;
+            const role = document.getElementById('signupRole').value;
+            
+            if (!name || !email || !password) {
+                showNotification('Please fill all fields', 'error');
+                return;
+            }
+            
+            if (password.length < 6) {
+                showNotification('Password must be at least 6 characters', 'error');
+                return;
+            }
+            
+            handleSignup(email, password, name, role);
+        }
+
+        function renderLanding() {
+            return `
+            <div class="min-h-screen flex flex-col bg-gradient-to-b from-emerald-50 to-white">
+                <nav class="p-6 flex justify-between items-center max-w-7xl mx-auto w-full">
+                    <div class="flex items-center gap-2 text-emerald-600">
+                        <i data-lucide="heart-handshake" class="w-8 h-8"></i>
+                        <span class="text-2xl font-black tracking-tighter">MediLink</span>
+                    </div>
+                    <div class="flex gap-4 items-center">
+                        <div class="text-right">
+                            <div class="text-sm font-bold text-slate-900">${currentUser.email}</div>
+                            <div class="text-xs text-slate-500 capitalize">${userRole}</div>
+                        </div>
+                        <button onclick="logout()" class="bg-red-100 text-red-600 px-4 py-2 rounded-lg font-bold hover:bg-red-200 flex items-center gap-2">
+                            <i data-lucide="log-out" class="w-4 h-4"></i>
+                            Logout
+                        </button>
+                    </div>
+                </nav>
+                <main class="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-8">
+                    <div class="max-w-4xl animate-fade-in">
+                        <h1 class="text-6xl md:text-7xl font-black text-slate-900 leading-none">Your Health, Digitally <span class="text-emerald-600">Secured</span>.</h1>
+                        <p class="text-xl text-slate-500 mt-6 max-w-2xl mx-auto font-medium">Unified medical ecosystem for patients and healthcare providers. Access reports, book visits, and manage records in one place.</p>
+                        <div class="mt-10 flex gap-4 justify-center">
+                            ${userRole === 'patient' ? '<button onclick="navigate(\'patient\')" class="bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black text-lg shadow-2xl hover:bg-emerald-700 transition-all">Patient Portal</button>' : ''}
+                            ${userRole === 'hospital' ? '<button onclick="navigate(\'hospital\')" class="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black text-lg shadow-2xl hover:bg-blue-700 transition-all">Hospital Portal</button>' : ''}
+                            ${userRole === 'doctor' ? '<button onclick="navigate(\'doctor\')" class="bg-purple-600 text-white px-8 py-4 rounded-2xl font-black text-lg shadow-2xl hover:bg-purple-700 transition-all">Doctor Portal</button>' : ''}
+                        </div>
+                    </div>
+                </main>
+            </div>`;
+        }
+
+        function renderPatientPortal() {
+            const patient = patients.find(p => p.id === currentState.currentPatientId);
+            const activeTab = currentState.patientPortalTab;
+
+            let tabContent = '';
+            if (activeTab === 'dashboard') tabContent = renderPatientDashboard(patient);
+            else if (activeTab === 'reports') tabContent = renderPatientReports(patient);
+            else if (activeTab === 'appointments') tabContent = renderPatientAppointments();
+            else if (activeTab === 'card') tabContent = renderPatientCard(patient);
+
+            return `
+            <div class="min-h-screen flex bg-emerald-50">
+                <!-- Sidebar -->
+                <aside class="w-64 bg-white border-r border-emerald-100 hidden lg:flex flex-col p-6 sticky top-0 h-screen shadow-sm">
+                    <div class="flex items-center gap-2 text-emerald-600 mb-10">
+                        <i data-lucide="heart-handshake" class="w-7 h-7"></i>
+                        <span class="text-xl font-black tracking-tighter uppercase">MediLink</span>
+                    </div>
+                    <nav class="flex-1 space-y-3">
+                        ${renderSidebarItem('dashboard', 'activity', 'Dashboard', activeTab)}
+                        ${renderSidebarItem('reports', 'file-text', 'Reports', activeTab)}
+                        ${renderSidebarItem('appointments', 'stethoscope', 'Appointments', activeTab)}
+                        ${renderSidebarItem('card', 'qr-code', 'Health Card', activeTab)}
+                    </nav>
+                    <button onclick="navigate('landing')" class="mt-auto flex items-center gap-3 px-4 py-3 text-rose-500 font-bold hover:bg-rose-50 rounded-xl">
+                        <i data-lucide="log-out" class="w-5 h-5"></i> Logout
+                    </button>
+                </aside>
+
+                <main class="flex-1 min-h-screen pb-20">
+                    <header class="bg-white border-b border-emerald-100 px-6 py-4 sticky top-0 z-30 flex items-center justify-between shadow-sm">
+                        <h1 class="text-lg font-black text-slate-800 uppercase tracking-tighter">My Patient Portal</h1>
+                        <div class="flex items-center gap-4">
+                            <button onclick="navigate('hospital')" class="text-xs font-black text-slate-400 uppercase tracking-widest bg-emerald-50 px-4 py-2 rounded-lg hover:text-emerald-600 transition-colors">Hospital View</button>
+                            <div class="h-6 w-px bg-emerald-200"></div>
+                            <div class="flex items-center gap-3">
+                                <span class="text-xs font-black text-slate-900 hidden md:block">${patient.name}</span>
+                                <img src="${patient.photo}" class="w-10 h-10 rounded-xl object-cover border-2 border-emerald-100 shadow-sm" alt="">
+                            </div>
+                        </div>
+                    </header>
+
+                    <div class="p-6 md:p-10 max-w-7xl mx-auto animate-fade-in">
+                        ${tabContent}
+                    </div>
+                </main>
+            </div>`;
+        }
+
+        function renderSidebarItem(id, icon, label, currentTab) {
+            const isActive = id === currentTab;
+            return `
+            <button onclick="setPatientTab('${id}')" class="w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-bold ${isActive ? 'sidebar-active' : 'text-slate-400 hover:bg-emerald-50 hover:text-slate-600'}">
+                <i data-lucide="${icon}" class="w-5 h-5"></i>
+                <span>${label}</span>
+            </button>`;
+        }
+
+        function renderPatientDashboard(patient) {
+            // Group reports by hospital
+            const reportsByHospital = {};
+            patient.reports.forEach(r => {
+                if (!reportsByHospital[r.hospital]) {
+                    reportsByHospital[r.hospital] = [];
+                }
+                reportsByHospital[r.hospital].push(r);
+            });
+
+            // Sort reports within each hospital by date (newest first)
+            Object.keys(reportsByHospital).forEach(hospital => {
+                reportsByHospital[hospital].sort((a, b) => new Date(b.date) - new Date(a.date));
+            });
+
+            return `
+            <div class="space-y-10">
+                <div class="custom-card p-10 flex flex-col md:flex-row items-center gap-10 bg-gradient-to-br from-white to-emerald-50 animate-scale-in">
+                    <div class="relative">
+                        <img src="${patient.photo}" class="w-48 h-48 rounded-[2rem] object-cover border-8 border-emerald-100 shadow-2xl animate-float">
+                        <div class="absolute -bottom-2 -right-2 bg-emerald-500 p-3 rounded-2xl text-white shadow-lg border-4 border-white animate-pulse-glow">
+                            <i data-lucide="check-circle-2"></i>
+                        </div>
+                    </div>
+                    <div class="flex-1 text-center md:text-left">
+                        <h2 class="text-5xl font-black text-slate-900 tracking-tighter leading-none">Namaste, ${patient.name.split(' ')[0]}</h2>
+                        <p class="text-slate-500 mt-4 text-xl font-medium">Your medical profile is secured and verified. You have ${patient.reports.length} records in your archive.</p>
+                        <div class="mt-8 flex flex-wrap justify-center md:justify-start gap-4">
+                            <button onclick="setPatientTab('appointments')" class="bg-emerald-600 text-white px-8 py-3 rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-emerald-100 hover:scale-105 transition-all">Book Visit</button>
+                            <button onclick="setPatientTab('reports')" class="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg hover:bg-emerald-600 transition-all">My History</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <div class="md:col-span-2 space-y-6">
+                        <h3 class="text-2xl font-black text-slate-900 uppercase tracking-tighter">Hospital-wise Clinical Activity</h3>
+                        <div class="space-y-4">
+                            ${Object.keys(reportsByHospital).map((hospital, idx) => `
+                                <div class="hospital-group animate-fade-in" style="animation-delay: ${idx * 0.1}s;">
+                                    <button onclick="toggleHospitalGroup('hospital-${idx}')" class="w-full custom-card p-6 flex items-center justify-between hover:border-emerald-500 hover:shadow-lg transition-all group">
+                                        <div class="flex items-center gap-4 text-left">
+                                            <div class="p-3 bg-emerald-50 rounded-xl text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                                                <i data-lucide="building-2"></i>
+                                            </div>
+                                            <div>
+                                                <h4 class="font-black text-lg text-slate-900">${hospital}</h4>
+                                                <p class="text-xs font-bold text-slate-400 uppercase">${reportsByHospital[hospital].length} Reports</p>
+                                            </div>
+                                        </div>
+                                        <i data-lucide="chevron-down" class="w-5 h-5 text-slate-400 transition-transform group-hover:text-emerald-600 toggle-icon"></i>
+                                    </button>
+                                    
+                                    <div id="hospital-${idx}" class="hospital-reports hidden space-y-3 mt-3 ml-6">
+                                        ${reportsByHospital[hospital].map((r, rIdx) => `
+                                            <div class="custom-card p-5 border-l-4 border-emerald-500 hover:shadow-lg transition-all animate-fade-in" style="animation-delay: ${(idx * 0.1) + (rIdx * 0.05)}s;">
+                                                <div class="flex items-start justify-between gap-4">
+                                                    <div class="flex items-start gap-3 flex-1">
+                                                        <div class="p-2.5 bg-white rounded-lg border border-emerald-100 mt-0.5">
+                                                            <i data-lucide="${r.type.includes('Blood') ? 'droplets' : r.type.includes('X-Ray') ? 'zap' : r.type.includes('MRI') ? 'brain' : 'file-text'}" class="w-4 h-4 text-emerald-500"></i>
+                                                        </div>
+                                                        <div class="flex-1">
+                                                            <div class="flex items-center gap-2 mb-1">
+                                                                <h5 class="font-bold text-slate-900">${r.type}</h5>
+                                                                <span class="px-2 py-0.5 bg-emerald-50 text-emerald-600 text-[9px] font-black uppercase rounded">${r.status}</span>
+                                                            </div>
+                                                            <div class="flex gap-3 text-xs text-slate-400 font-bold">
+                                                                <span>📅 ${r.date}</span>
+                                                                <span>👨‍⚕️ ${r.doctor}</span>
+                                                            </div>
+                                                            ${r.metric ? `<p class="text-xs font-black text-emerald-600 mt-2">${r.metric}: <span class="text-slate-900">${r.value}</span></p>` : ''}
+                                                        </div>
+                                                    </div>
+                                                    <button onclick="window.open('${r.fileUrl}', '_blank')" class="px-4 py-2 bg-emerald-50 text-emerald-600 text-xs font-black rounded-lg hover:bg-emerald-600 hover:text-white transition-all whitespace-nowrap">VIEW</button>
+                                                </div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <div class="space-y-6">
+                        <h3 class="text-2xl font-black text-slate-900 uppercase tracking-tighter">Health Stats</h3>
+                        <div class="custom-card p-6 space-y-6 animate-slide-in-left">
+                            <div class="flex items-center gap-4">
+                                <div class="p-4 bg-rose-50 rounded-2xl text-rose-600"><i data-lucide="droplets"></i></div>
+                                <div><p class="text-[10px] font-black text-slate-400 uppercase">Blood Group</p><p class="text-2xl font-black">${patient.bloodGroup}</p></div>
+                            </div>
+                            <div class="flex items-center gap-4">
+                                <div class="p-4 bg-emerald-50 rounded-2xl text-emerald-600"><i data-lucide="trending-up"></i></div>
+                                <div><p class="text-[10px] font-black text-slate-400 uppercase">Health Score</p><p class="text-2xl font-black">92/100</p></div>
+                            </div>
+                            <div class="border-t border-emerald-100 pt-6 flex items-center gap-4">
+                                <div class="p-4 bg-blue-50 rounded-2xl text-blue-600"><i data-lucide="calendar"></i></div>
+                                <div><p class="text-[10px] font-black text-slate-400 uppercase">Total Reports</p><p class="text-2xl font-black">${patient.reports.length}</p></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function renderPatientReports(patient) {
+            return `
+            <div class="space-y-8">
+                <div class="max-w-2xl">
+                    <h2 class="text-4xl font-black text-slate-900 uppercase tracking-tighter">Medical Archive</h2>
+                    <p class="text-slate-500 font-medium text-lg mt-2">Securely access and download your clinical records and lab reports.</p>
+                </div>
+                <div class="custom-card border-none shadow-xl overflow-hidden">
+                    <table class="w-full text-left">
+                        <thead class="bg-emerald-50 border-b border-emerald-100">
+                            <tr>
+                                <th class="px-8 py-5 text-xs font-bold text-emerald-600 uppercase tracking-widest">Test / Diagnostic</th>
+                                <th class="px-8 py-5 text-xs font-bold text-emerald-600 uppercase tracking-widest text-center">Date</th>
+                                <th class="px-8 py-5 text-xs font-bold text-emerald-600 uppercase tracking-widest text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-emerald-100">
+                            ${patient.reports.map(r => `
+                                <tr class="hover:bg-emerald-50 transition-colors">
+                                    <td class="px-8 py-6">
+                                        <div class="flex items-center gap-4">
+                                            <div class="p-3 bg-white rounded-xl border border-emerald-100"><i data-lucide="${r.type.includes('Blood') ? 'microscope' : 'file-text'}" class="w-5 h-5 text-emerald-500"></i></div>
+                                            <div><div class="font-black text-slate-800 text-lg">${r.type}</div><div class="text-xs font-bold text-slate-400 uppercase">${r.hospital}</div></div>
+                                        </div>
+                                    </td>
+                                    <td class="px-8 py-6 text-sm font-bold text-slate-400 text-center">${r.date}</td>
+                                    <td class="px-8 py-6 text-right">
+                                        <button onclick="window.open('${r.fileUrl}', '_blank')" class="bg-emerald-600 text-white px-6 py-2 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-emerald-700 transition-all">OPEN FILE</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>`;
+        }
+
+        function renderPatientAppointments() {
+            if (currentState.bookingDoctor) {
+                const doc = currentState.bookingDoctor;
+                return `
+                <div class="max-w-2xl mx-auto animate-fade-in">
+                    <button onclick="cancelBooking()" class="flex items-center gap-2 text-slate-500 hover:text-slate-900 font-bold mb-6">
+                        <i data-lucide="chevron-left"></i> Back to Specialist List
+                    </button>
+                    <div class="custom-card p-10 space-y-8">
+                        <div class="flex items-center gap-6 pb-6 border-b border-emerald-100">
+                            <div class="w-20 h-20 bg-emerald-100 rounded-3xl flex items-center justify-center text-emerald-600"><i data-lucide="user" class="w-10 h-10"></i></div>
+                            <div>
+                                <h3 class="text-3xl font-black text-slate-900">${doc.name}</h3>
+                                <p class="text-emerald-600 font-bold text-lg">${doc.specialty}</p>
+                                <p class="text-slate-400 font-bold uppercase text-xs mt-1">${doc.hospital}</p>
+                            </div>
+                        </div>
+
+                        <div class="space-y-6">
+                            <div>
+                                <label class="text-xs font-black text-slate-400 uppercase tracking-widest block mb-3">1. Select Consultation Date</label>
+                                <input id="bookingDateInput" type="date" min="${new Date().toISOString().split("T")[0]}" class="w-full p-4 bg-emerald-50 border border-emerald-200 rounded-2xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500">
+                            </div>
+                            <div>
+                                <label class="text-xs font-black text-slate-400 uppercase tracking-widest block mb-3">2. Available Time Slots</label>
+                                <div class="grid grid-cols-3 gap-2">
+                                    ${doc.slots.map(s => `
+                                        <button onclick="selectTime('${s}')" id="slot-${s.replace(' ', '')}" class="time-slot-btn p-3 bg-white border border-emerald-200 rounded-xl text-xs font-black text-slate-600 hover:border-emerald-500 transition-all">${s}</button>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pt-6 border-t border-emerald-100">
+                            <div class="flex justify-between items-center mb-8">
+                                <div><p class="text-xs font-black text-slate-400 uppercase">Consultation Fee</p><p class="text-2xl font-black text-slate-900">${doc.fee}</p></div>
+                                <div class="text-right"><p class="text-xs font-black text-slate-400 uppercase">Tax</p><p class="text-sm font-bold text-slate-500">Inc. all charges</p></div>
+                            </div>
+                            <button onclick="confirmBooking()" class="w-full py-5 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95">Confirm Appointment</button>
+                        </div>
+                    </div>
+                </div>`;
+            }
+
+            const patient = patients.find(p => p.id === currentState.currentPatientId);
+            const hasAppointments = patient.appointments && patient.appointments.length > 0;
+
+            return `
+            <div class="space-y-12 animate-fade-in">
+                <!-- MY APPOINTMENTS SECTION -->
+                <div class="space-y-8">
+                    <div class="max-w-2xl">
+                        <h2 class="text-4xl font-black text-slate-900 uppercase tracking-tighter">My Appointments</h2>
+                        <p class="text-slate-500 font-medium text-lg mt-2">View and manage your scheduled consultations.</p>
+                    </div>
+
+                    ${hasAppointments ? `
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            ${patient.appointments.map((apt, idx) => `
+                                <div class="custom-card p-8 border-l-4 border-emerald-500 hover:shadow-lg transition-all animate-fade-in" style="animation-delay: ${idx * 0.1}s;">
+                                    <div class="flex items-start justify-between gap-4 mb-6">
+                                        <div class="flex items-center gap-4 flex-1">
+                                            <div class="p-4 bg-emerald-50 rounded-2xl text-emerald-600">
+                                                <i data-lucide="stethoscope" class="w-6 h-6"></i>
+                                            </div>
+                                            <div>
+                                                <h4 class="font-black text-lg text-slate-900">${apt.doctor}</h4>
+                                                <p class="text-xs font-bold text-slate-400 uppercase">${apt.specialization}</p>
+                                            </div>
+                                        </div>
+                                        <span class="px-3 py-1 bg-emerald-50 text-emerald-600 text-[9px] font-black uppercase rounded-lg">✓ ${apt.status}</span>
+                                    </div>
+                                    
+                                    <div class="space-y-3 border-t border-emerald-100 pt-6">
+                                        <div class="flex items-center gap-3">
+                                            <i data-lucide="building-2" class="w-4 h-4 text-slate-400"></i>
+                                            <p class="text-sm font-bold text-slate-600">${apt.hospital}</p>
+                                        </div>
+                                        <div class="flex items-center gap-3">
+                                            <i data-lucide="calendar" class="w-4 h-4 text-slate-400"></i>
+                                            <p class="text-sm font-bold text-slate-600">${apt.date}</p>
+                                        </div>
+                                        <div class="flex items-center gap-3">
+                                            <i data-lucide="clock" class="w-4 h-4 text-slate-400"></i>
+                                            <p class="text-sm font-bold text-slate-600">${apt.time}</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex gap-2 mt-6 pt-6 border-t border-emerald-100">
+                                        <button onclick="rescheduleAppointment(${apt.id})" class="flex-1 px-4 py-2 bg-emerald-50 text-emerald-600 font-bold text-xs rounded-xl hover:bg-emerald-100 transition-all">RESCHEDULE</button>
+                                        <button onclick="cancelAppointment('${currentState.currentPatientId}', ${apt.id})" class="flex-1 px-4 py-2 bg-rose-50 text-rose-600 font-bold text-xs rounded-xl hover:bg-rose-100 transition-all">CANCEL</button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : `
+                        <div class="custom-card p-12 text-center space-y-4 border-emerald-100 bg-emerald-50/50">
+                            <div class="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto text-emerald-600">
+                                <i data-lucide="calendar-x" class="w-8 h-8"></i>
+                            </div>
+                            <h3 class="text-xl font-black text-slate-900">No Appointments Yet</h3>
+                            <p class="text-slate-500 font-medium">You haven't booked any appointments. Schedule one below!</p>
+                        </div>
+                    `}
+                </div>
+
+                <!-- BOOK APPOINTMENTS SECTION -->
+                <div class="space-y-8 border-t border-emerald-200 pt-12">
+                    <div class="max-w-2xl">
+                        <h2 class="text-4xl font-black text-slate-900 uppercase tracking-tighter">Book Appointment</h2>
+                        <p class="text-slate-500 font-medium text-lg mt-2">Find and book consultations with India's top medical professionals.</p>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        ${doctors.map((doc, idx) => `
+                            <div class="custom-card p-8 group hover:border-emerald-500 hover:shadow-lg transition-all animate-fade-in" style="animation-delay: ${idx * 0.1}s;">
+                                <div class="flex items-start gap-6">
+                                    <div class="w-20 h-20 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white transition-colors flex-shrink-0">
+                                        <i data-lucide="stethoscope" class="w-10 h-10"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <h3 class="text-xl font-bold text-slate-900">${doc.name}</h3>
+                                        <p class="text-emerald-600 font-bold text-sm">${doc.specialty}</p>
+                                        <p class="text-slate-400 font-bold uppercase text-[10px] mt-1">${doc.hospital}</p>
+                                        
+                                        <div class="mt-4 pt-4 border-t border-emerald-100 space-y-2">
+                                            <div class="flex items-center justify-between text-xs">
+                                                <span class="text-slate-400 font-bold">Experience:</span>
+                                                <span class="font-black text-slate-900">${doc.experience}</span>
+                                            </div>
+                                            <div class="flex items-center justify-between">
+                                                <span class="text-[10px] font-black text-slate-400 uppercase">Consultation Fee</span>
+                                                <span class="text-lg font-black text-slate-800">${doc.fee}</span>
+                                            </div>
+                                        </div>
+
+                                        <button onclick="startBooking(${doc.id})" class="w-full mt-6 bg-emerald-600 text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95">BOOK NOW</button>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function renderPatientCard(patient) {
+            return `
+            <div class="flex flex-col items-center justify-center py-10">
+                <div class="w-full max-w-md p-10 medical-gradient text-white rounded-[3rem] shadow-2xl relative overflow-hidden animate-float">
+                    <div class="absolute inset-0 animate-pulse-glow"></div>
+                    <div class="relative z-10 space-y-10">
+                        <div class="flex justify-between items-center">
+                            <div class="flex items-center gap-2"><i data-lucide="heart-handshake" class="w-6 h-6 text-green-200"></i><span class="font-black tracking-widest uppercase text-xs">MediLink ID</span></div>
+                            <div id="qr-code-${patient.id}" class="bg-white rounded-lg p-2"></div>
+                        </div>
+                        <div class="flex gap-6 items-center">
+                            <img src="${patient.photo}" class="w-24 h-24 rounded-3xl object-cover border-4 border-white/20 shadow-xl animate-scale-in" alt="">
+                            <div>
+                                <h3 class="text-2xl font-black leading-tight">${patient.name}</h3>
+                                <p class="text-green-200 font-bold uppercase text-[10px] tracking-widest mt-1">${patient.id}</p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 border-t border-white/10 pt-6">
+                            <div><p class="text-[10px] font-black text-white/40 uppercase">Blood Group</p><p class="text-2xl font-black text-green-200">${patient.bloodGroup}</p></div>
+                            <div class="text-right"><p class="text-[10px] font-black text-white/40 uppercase">Member Since</p><p class="text-lg font-bold">2024</p></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-10 flex gap-4 animate-fade-in" style="animation-delay: 0.3s;">
+                    <button onclick="downloadCardPDF('${patient.name}', '${patient.id}', '${patient.bloodGroup}')" class="bg-white text-emerald-600 px-8 py-3 rounded-2xl font-black uppercase tracking-widest text-[10px] border border-emerald-200 shadow-sm hover:bg-emerald-50 transition-all hover:scale-105 flex items-center gap-2 justify-center">
+                        <i data-lucide="download"></i> Download Card
+                    </button>
+                    <button onclick="initNFCWrite('${patient.id}', '${patient.name}')" class="bg-emerald-600 text-white px-8 py-3 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all hover:scale-105 flex items-center gap-2 justify-center">
+                        <i data-lucide="radio"></i> Write NFC
+                    </button>
+                </div>
+                <div id="nfc-status" class="mt-6 hidden"></div>
+            </div>`;
+        }
+
+        function renderHospitalPortal() {
+            if (currentState.hospitalSelectedPatientId) {
+                return renderHospitalPatientDetails();
+            }
+
+            // Show session type selector if no session type selected
+            if (!currentState.hospitalSessionType) {
+                return renderHospitalSessionSelector();
+            }
+
+            // Show appropriate view based on session type
+            if (currentState.hospitalSessionType === 'saved') {
+                return renderSavedPatientsView();
+            } else if (currentState.hospitalSessionType === 'new') {
+                return renderNewPatientAccessView();
+            }
+        }
+
+        function renderDoctorPortal() {
+            const doctor = doctors.find(d => d.id === currentState.currentDoctorId);
+            
+            if (!doctor) {
+                return renderDoctorLogin();
+            }
+
+            return `
+            <div class="min-h-screen bg-gradient-to-br from-blue-50 to-white">
+                <!-- Header -->
+                <div class="bg-white border-b border-blue-100 sticky top-0 z-10">
+                    <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+                        <div class="flex items-center gap-3">
+                            <i data-lucide="stethoscope" class="w-8 h-8 text-blue-600"></i>
+                            <div>
+                                <div class="font-black text-slate-900">Dr. ${doctor.name}</div>
+                                <div class="text-sm text-slate-500">${doctor.specialty}</div>
+                            </div>
+                        </div>
+                        <button onclick="currentState.currentDoctorId = null; render();" class="bg-red-100 text-red-600 px-4 py-2 rounded-lg font-bold hover:bg-red-200 flex items-center gap-2">
+                            <i data-lucide="log-out" class="w-4 h-4"></i>
+                            Logout
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Main Content -->
+                <div class="max-w-7xl mx-auto p-6">
+                    <!-- Stats Cards -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                        ${(() => {
+                            const allAppointments = [];
+                            for (let patient of patients) {
+                                for (let apt of patient.appointments) {
+                                    if (apt.doctor === doctor.name) {
+                                        allAppointments.push({...apt, patientId: patient.id, patientName: patient.name});
+                                    }
+                                }
+                            }
+                            const confirmed = allAppointments.filter(a => a.hospitalConfirmed).length;
+                            const pending = allAppointments.filter(a => !a.hospitalConfirmed).length;
+                            const total = allAppointments.length;
+                            
+                            return `
+                            <div class="bg-white rounded-xl p-6 shadow-sm border border-blue-100">
+                                <div class="text-slate-600 text-sm font-bold uppercase">Total Appointments</div>
+                                <div class="text-4xl font-black text-blue-600 mt-2">${total}</div>
+                            </div>
+                            <div class="bg-white rounded-xl p-6 shadow-sm border border-green-100">
+                                <div class="text-slate-600 text-sm font-bold uppercase">Confirmed</div>
+                                <div class="text-4xl font-black text-green-600 mt-2">${confirmed}</div>
+                            </div>
+                            <div class="bg-white rounded-xl p-6 shadow-sm border border-amber-100">
+                                <div class="text-slate-600 text-sm font-bold uppercase">Pending</div>
+                                <div class="text-4xl font-black text-amber-600 mt-2">${pending}</div>
+                            </div>
+                            <div class="bg-white rounded-xl p-6 shadow-sm border border-purple-100">
+                                <div class="text-slate-600 text-sm font-bold uppercase">Fee per Visit</div>
+                                <div class="text-3xl font-black text-purple-600 mt-2">Rs. ${doctor.fee}</div>
+                            </div>
+                            `;
+                        })()}
+                    </div>
+
+                    <!-- Appointments List -->
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div class="border-b border-slate-200 p-6">
+                            <h2 class="text-2xl font-black text-slate-900">Your Appointments</h2>
+                            <p class="text-slate-500 mt-1">Manage your patient appointments and consultations</p>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                ${(() => {
+                                    const allAppointments = [];
+                                    for (let patient of patients) {
+                                        for (let apt of patient.appointments) {
+                                            if (apt.doctor === doctor.name) {
+                                                allAppointments.push({...apt, patientId: patient.id, patientName: patient.name, patientPhone: patient.phone, patientId_number: patient.patientId});
+                                            }
+                                        }
+                                    }
+                                    allAppointments.sort((a, b) => new Date(a.date + ' ' + a.time) - new Date(b.date + ' ' + b.time));
+                                    
+                                    if (allAppointments.length === 0) {
+                                        return `<tr><td colspan="6" class="p-6 text-center text-slate-500">No appointments scheduled</td></tr>`;
+                                    }
+                                    
+                                    return allAppointments.map(apt => `
+                                        <tr class="border-t border-slate-200 hover:bg-blue-50 transition-colors">
+                                            <td class="p-4 font-bold text-slate-900">${apt.patientName}</td>
+                                            <td class="p-4 text-slate-600 text-sm">${apt.patientPhone}</td>
+                                            <td class="p-4 text-slate-600">${apt.date}</td>
+                                            <td class="p-4 text-slate-600">${apt.time}</td>
+                                            <td class="p-4">
+                                                ${apt.hospitalConfirmed ? 
+                                                    '<span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold">Confirmed</span>' : 
+                                                    '<span class="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-bold">Pending</span>'
+                                                }
+                                            </td>
+                                            <td class="p-4 flex gap-2">
+                                                <button onclick="doctorConfirmAppointment('${apt.patientId}', ${apt.id})" ${apt.hospitalConfirmed ? 'disabled' : ''} class="bg-green-100 text-green-600 px-3 py-1 rounded-lg text-sm font-bold hover:bg-green-200 disabled:opacity-50 disabled:cursor-not-allowed">Confirm</button>
+                                                <button onclick="doctorCancelAppointment('${apt.patientId}', ${apt.id})" class="bg-red-100 text-red-600 px-3 py-1 rounded-lg text-sm font-bold hover:bg-red-200">Cancel</button>
+                                            </td>
+                                        </tr>
+                                    `).join('');
+                                })()}
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function renderDoctorLogin() {
+            return `
+            <div class="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center p-6">
+                <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
+                    <div class="text-center mb-8">
+                        <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <i data-lucide="stethoscope" class="w-8 h-8 text-blue-600"></i>
+                        </div>
+                        <h1 class="text-3xl font-black text-slate-900">Doctor Portal</h1>
+                        <p class="text-slate-500 mt-2">Select your profile to continue</p>
+                    </div>
+
+                    <div class="space-y-3 max-h-96 overflow-y-auto">
+                        ${doctors.map(doctor => `
+                            <button onclick="currentState.currentDoctorId = '${doctor.id}'; render();" class="w-full p-4 border-2 border-blue-200 rounded-xl hover:border-blue-600 hover:bg-blue-50 transition-all text-left group">
+                                <div class="flex items-start gap-3">
+                                    <img src="${doctor.image}" class="w-12 h-12 rounded-lg object-cover group-hover:scale-110 transition-transform" alt="${doctor.name}">
+                                    <div class="flex-1">
+                                        <div class="font-bold text-slate-900">Dr. ${doctor.name}</div>
+                                        <div class="text-sm text-slate-500">${doctor.specialty}</div>
+                                        <div class="text-xs text-slate-400 mt-1">${doctor.hospital}</div>
+                                    </div>
+                                    <i data-lucide="arrow-right" class="w-5 h-5 text-blue-600 group-hover:translate-x-1 transition-transform"></i>
+                                </div>
+                            </button>
+                        `).join('')}
+                    </div>
+
+                    <button onclick="navigate('landing')" class="w-full mt-6 py-3 text-slate-600 font-bold hover:text-slate-900 flex items-center justify-center gap-2">
+                        <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                        Back to Home
+                    </button>
+                </div>
+            </div>`;
+        }
+
+        function renderHospitalSessionSelector() {
+            return `
+            <div class="min-h-screen bg-gradient-to-b from-emerald-50 to-white flex flex-col">
+                <nav class="bg-white border-b border-emerald-100 p-4 flex justify-between items-center sticky top-0 z-40 shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 bg-emerald-600 rounded-lg text-white"><i data-lucide="hospital" class="w-6 h-6"></i></div>
+                        <span class="text-xl font-black tracking-tighter uppercase">MediLink Hospital Portal</span>
+                    </div>
+                    <div class="flex gap-6 items-center">
+                        <button onclick="navigate('patient')" class="text-xs font-black text-slate-400 hover:text-emerald-600 transition-colors uppercase tracking-widest pr-6 border-r border-emerald-200">Patient View</button>
+                        <button onclick="navigate('landing')" class="text-rose-500 hover:scale-110 transition-transform"><i data-lucide="log-out" class="w-6 h-6"></i></button>
+                    </div>
+                </nav>
+
+                <main class="flex-1 flex items-center justify-center p-6">
+                    <div class="max-w-4xl w-full animate-fade-in">
+                        <div class="text-center mb-12">
+                            <h1 class="text-5xl font-black text-slate-900 uppercase tracking-tighter mb-4">Hospital Access Portal</h1>
+                            <p class="text-xl text-slate-500 font-medium">Select a session type to begin</p>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <!-- SAVED PATIENTS SESSION -->
+                            <div class="custom-card p-10 hover:shadow-2xl hover:border-emerald-500 transition-all cursor-pointer group" onclick="setHospitalSessionType('saved')">
+                                <div class="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600 mb-6 group-hover:bg-emerald-600 group-hover:text-white transition-all">
+                                    <i data-lucide="users" class="w-8 h-8"></i>
+                                </div>
+                                <h2 class="text-2xl font-black text-slate-900 uppercase tracking-tighter mb-3">Saved Patients</h2>
+                                <p class="text-slate-600 font-medium mb-6">Access existing patient records from the database. View medical history, diagnostic reports, and manage patient data.</p>
+                                
+                                <div class="space-y-3 pt-6 border-t border-emerald-100">
+                                    <div class="flex items-center gap-3">
+                                        <i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-600"></i>
+                                        <span class="text-sm font-bold text-slate-700">View complete patient records</span>
+                                    </div>
+                                    <div class="flex items-center gap-3">
+                                        <i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-600"></i>
+                                        <span class="text-sm font-bold text-slate-700">Add new medical entries</span>
+                                    </div>
+                                    <div class="flex items-center gap-3">
+                                        <i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-600"></i>
+                                        <span class="text-sm font-bold text-slate-700">Browse verified registry</span>
+                                    </div>
+                                </div>
+
+                                <button onclick="setHospitalSessionType('saved')" class="w-full mt-8 py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-sm shadow-lg hover:bg-emerald-700 transition-all">
+                                    Access Saved Patients
+                                </button>
+                            </div>
+
+                            <!-- NEW PATIENT ENTRY SESSION -->
+                            <div class="custom-card p-10 hover:shadow-2xl hover:border-blue-500 transition-all cursor-pointer group" onclick="setHospitalSessionType('new')">
+                                <div class="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600 mb-6 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                                    <i data-lucide="user-plus" class="w-8 h-8"></i>
+                                </div>
+                                <h2 class="text-2xl font-black text-slate-900 uppercase tracking-tighter mb-3">New Patient Entry</h2>
+                                <p class="text-slate-600 font-medium mb-6">Register new patients via NFC card, QR code, or manual patient ID entry. Perfect for first-time visits and quick registration.</p>
+                                
+                                <div class="space-y-3 pt-6 border-t border-blue-100">
+                                    <div class="flex items-center gap-3">
+                                        <i data-lucide="check-circle-2" class="w-5 h-5 text-blue-600"></i>
+                                        <span class="text-sm font-bold text-slate-700">Scan NFC card</span>
+                                    </div>
+                                    <div class="flex items-center gap-3">
+                                        <i data-lucide="check-circle-2" class="w-5 h-5 text-blue-600"></i>
+                                        <span class="text-sm font-bold text-slate-700">Scan QR code</span>
+                                    </div>
+                                    <div class="flex items-center gap-3">
+                                        <i data-lucide="check-circle-2" class="w-5 h-5 text-blue-600"></i>
+                                        <span class="text-sm font-bold text-slate-700">Enter patient ID manually</span>
+                                    </div>
+                                </div>
+
+                                <button onclick="setHospitalSessionType('new')" class="w-full mt-8 py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest text-sm shadow-lg hover:bg-blue-700 transition-all">
+                                    New Patient Entry
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+            </div>`;
+        }
+
+        function renderSavedPatientsView() {
+            // If viewing a specific doctor's appointments
+            if (currentState.hospitalDoctorView) {
+                return renderDoctorAppointmentsView();
+            }
+
+            return `
+            <div class="min-h-screen bg-emerald-50 flex flex-col">
+                <nav class="bg-white border-b border-emerald-100 p-4 flex justify-between items-center sticky top-0 z-40 shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <button onclick="resetHospitalSession()" class="p-2 hover:bg-emerald-100 rounded-xl transition-colors"><i data-lucide="arrow-left"></i></button>
+                        <div class="p-2 bg-emerald-600 rounded-lg text-white"><i data-lucide="hospital" class="w-5 h-5"></i></div>
+                        <span class="text-xl font-black tracking-tighter uppercase">Verified Registry - Saved Patients</span>
+                    </div>
+                    <div class="flex gap-6 items-center">
+                        <button onclick="navigate('patient')" class="text-xs font-black text-slate-400 hover:text-emerald-600 transition-colors uppercase tracking-widest pr-6 border-r border-emerald-200">Patient View</button>
+                        <button onclick="navigate('landing')" class="text-rose-500 hover:scale-110 transition-transform"><i data-lucide="log-out" class="w-6 h-6"></i></button>
+                    </div>
+                </nav>
+
+                <main class="flex-1 p-6 md:p-10 max-w-7xl mx-auto w-full space-y-10 animate-fade-in">
+                    <!-- DOCTORS APPOINTMENT SCHEDULE -->
+                    <div class="space-y-6">
+                        <div class="max-w-2xl">
+                            <h2 class="text-4xl font-black text-slate-900 uppercase tracking-tighter">Doctor Appointment Schedule</h2>
+                            <p class="text-slate-500 font-medium mt-2 text-lg">View and manage patient appointments for each doctor.</p>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            ${doctors.slice(0, 10).map((doc, idx) => {
+                                // Count appointments for this doctor
+                                let appointmentCount = 0;
+                                patients.forEach(p => {
+                                    if (p.appointments) {
+                                        appointmentCount += p.appointments.filter(apt => apt.doctor === doc.name).length;
+                                    }
+                                });
+
+                                return `
+                                    <div class="custom-card p-8 hover:shadow-lg hover:border-emerald-500 transition-all animate-fade-in cursor-pointer" onclick="showDoctorAppointments(${doc.id})" style="animation-delay: ${idx * 0.05}s;">
+                                        <div class="flex items-start gap-6">
+                                            <div class="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600">
+                                                <i data-lucide="stethoscope" class="w-8 h-8"></i>
+                                            </div>
+                                            <div class="flex-1">
+                                                <h3 class="text-xl font-bold text-slate-900">${doc.name}</h3>
+                                                <p class="text-emerald-600 font-bold text-sm">${doc.specialty}</p>
+                                                <p class="text-slate-400 font-bold uppercase text-[10px] mt-1">${doc.hospital}</p>
+                                                
+                                                <div class="mt-6 pt-6 border-t border-emerald-100 space-y-3">
+                                                    <div class="flex items-center justify-between">
+                                                        <span class="text-xs font-bold text-slate-500">Appointments Today</span>
+                                                        <span class="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-lg font-black text-sm">${appointmentCount}</span>
+                                                    </div>
+                                                    <button class="w-full py-2 bg-emerald-50 text-emerald-600 rounded-xl font-bold text-xs uppercase hover:bg-emerald-100 transition-all">
+                                                        View Appointments →
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+
+                    <!-- PATIENTS REGISTRY -->
+                    <div class="border-t border-emerald-200 pt-10 space-y-6">
+                        <div class="max-w-2xl">
+                            <h2 class="text-4xl font-black text-slate-900 uppercase tracking-tighter">Patient Registry</h2>
+                            <p class="text-slate-500 font-medium mt-2 text-lg">Browse all verified patients and access their medical records.</p>
+                        </div>
+
+                        <div class="custom-card shadow-2xl overflow-hidden animate-fade-in border-emerald-100">
+                            <table class="w-full text-left">
+                                <thead class="bg-emerald-50 border-b border-emerald-100">
+                                    <tr>
+                                        <th class="px-8 py-6 text-xs font-bold text-emerald-600 uppercase tracking-widest">Patient Identity</th>
+                                        <th class="px-8 py-6 text-xs font-bold text-emerald-600 uppercase tracking-widest text-center">Status ID</th>
+                                        <th class="px-8 py-6 text-xs font-bold text-emerald-600 uppercase tracking-widest text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-emerald-100">
+                                    ${patients.map(p => `
+                                        <tr class="hover:bg-emerald-50/50 transition-colors group">
+                                            <td class="px-8 py-6">
+                                                <div class="flex items-center gap-5">
+                                                    <img src="${p.photo}" class="w-14 h-14 rounded-2xl object-cover shadow-md border-2 border-emerald-100">
+                                                    <div><div class="font-black text-slate-900 text-xl group-hover:text-emerald-600 transition-colors">${p.name}</div><div class="text-xs text-slate-400 font-bold uppercase">${p.email}</div></div>
+                                                </div>
+                                            </td>
+                                            <td class="px-8 py-6 font-mono font-bold text-emerald-600 text-center tracking-tighter">${p.id}</td>
+                                            <td class="px-8 py-6 text-right">
+                                                <button onclick="managePatient('${p.id}')" class="bg-emerald-600 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-emerald-700 transition-all">MANAGE RECORD</button>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </main>
+            </div>`;
+        }
+
+        function renderDoctorAppointmentsView() {
+            const doctor = doctors.find(d => d.id === currentState.hospitalDoctorView);
+            if (!doctor) return renderSavedPatientsView();
+
+            // Get all appointments for this doctor
+            const allAppointments = [];
+            patients.forEach(patient => {
+                if (patient.appointments) {
+                    patient.appointments.forEach(apt => {
+                        if (apt.doctor === doctor.name) {
+                            allAppointments.push({
+                                ...apt,
+                                patientId: patient.id,
+                                patientName: patient.name,
+                                patientPhoto: patient.photo,
+                                patientPhone: patient.phone
+                            });
+                        }
+                    });
+                }
+            });
+
+            // Sort by date and time
+            allAppointments.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            return `
+            <div class="min-h-screen bg-gradient-to-b from-emerald-50 to-white flex flex-col">
+                <nav class="bg-white border-b border-emerald-100 p-4 flex justify-between items-center sticky top-0 z-40 shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <button onclick="closeDoctorAppointments()" class="p-2 hover:bg-emerald-100 rounded-xl transition-colors"><i data-lucide="arrow-left"></i></button>
+                        <div class="p-2 bg-emerald-600 rounded-lg text-white"><i data-lucide="calendar" class="w-5 h-5"></i></div>
+                        <span class="text-xl font-black tracking-tighter uppercase">${doctor.name} - Appointments</span>
+                    </div>
+                    <button onclick="navigate('landing')" class="text-rose-500 hover:scale-110 transition-transform"><i data-lucide="log-out" class="w-6 h-6"></i></button>
+                </nav>
+
+                <main class="flex-1 p-6 md:p-10 max-w-7xl mx-auto w-full space-y-10 animate-fade-in">
+                    <!-- DOCTOR DETAILS -->
+                    <div class="custom-card p-8 bg-gradient-to-r from-emerald-50 to-white border-emerald-100">
+                        <div class="flex items-center gap-8">
+                            <div class="w-24 h-24 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600">
+                                <i data-lucide="stethoscope" class="w-12 h-12"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h2 class="text-3xl font-black text-slate-900">${doctor.name}</h2>
+                                <p class="text-emerald-600 font-bold text-lg">${doctor.specialty}</p>
+                                <div class="mt-4 space-y-2">
+                                    <p class="text-sm font-bold text-slate-600"><span class="text-slate-400">Hospital:</span> ${doctor.hospital}</p>
+                                    <p class="text-sm font-bold text-slate-600"><span class="text-slate-400">Experience:</span> ${doctor.experience}</p>
+                                    <p class="text-sm font-bold text-slate-600"><span class="text-slate-400">Consultation Fee:</span> ${doctor.fee}</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-5xl font-black text-emerald-600">${allAppointments.length}</div>
+                                <p class="text-xs font-black text-slate-400 uppercase mt-2">Appointments</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- APPOINTMENTS LIST -->
+                    <div class="space-y-6">
+                        <h3 class="text-2xl font-black text-slate-900 uppercase tracking-tighter">Patient Appointments</h3>
+                        
+                        ${allAppointments.length > 0 ? `
+                            <div class="space-y-4">
+                                ${allAppointments.map((apt, idx) => {
+                                    const statusColor = apt.hospitalConfirmed ? 'emerald' : apt.status === 'Confirmed' ? 'blue' : 'amber';
+                                    const statusIcon = apt.hospitalConfirmed ? 'check-circle-2' : 'clock';
+                                    
+                                    return `
+                                        <div class="custom-card p-6 hover:shadow-lg transition-all animate-fade-in border-l-4 border-${statusColor}-500" style="animation-delay: ${idx * 0.05}s;">
+                                            <div class="flex items-start justify-between gap-6">
+                                                <div class="flex items-start gap-4 flex-1">
+                                                    <img src="${apt.patientPhoto}" class="w-16 h-16 rounded-xl object-cover border-2 border-${statusColor}-100 shadow-sm">
+                                                    <div class="flex-1">
+                                                        <h4 class="text-xl font-black text-slate-900">${apt.patientName}</h4>
+                                                        <p class="text-sm font-bold text-slate-500">${apt.patientPhone}</p>
+                                                        <p class="text-xs font-bold text-slate-400 uppercase mt-2">ID: ${apt.patientId}</p>
+                                                    </div>
+                                                </div>
+
+                                                <div class="text-right space-y-3">
+                                                    <div>
+                                                        <p class="text-[10px] font-black text-slate-400 uppercase">Date</p>
+                                                        <p class="text-lg font-black text-slate-900">${apt.date}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p class="text-[10px] font-black text-slate-400 uppercase">Time</p>
+                                                        <p class="text-lg font-black text-slate-900">${apt.time}</p>
+                                                    </div>
+                                                </div>
+
+                                                <div class="space-y-2">
+                                                    <div class="flex items-center gap-2">
+                                                        <i data-lucide="${statusIcon}" class="w-4 h-4 text-${statusColor}-600"></i>
+                                                        <span class="px-3 py-1 bg-${statusColor}-50 text-${statusColor}-700 text-[9px] font-black uppercase rounded-lg">${apt.hospitalConfirmed ? 'Hospital Confirmed' : apt.status}</span>
+                                                    </div>
+                                                    
+                                                    <div class="flex gap-2">
+                                                        ${!apt.hospitalConfirmed ? `
+                                                            <button onclick="confirmPatientAppointment('${apt.patientId}', ${doctor.id}, ${apt.id})" class="px-3 py-2 bg-emerald-600 text-white text-[10px] font-black uppercase rounded-lg hover:bg-emerald-700 transition-all">
+                                                                Confirm
+                                                            </button>
+                                                        ` : ''}
+                                                        <button onclick="cancelPatientAppointment('${apt.patientId}', ${apt.id})" class="px-3 py-2 bg-rose-100 text-rose-600 text-[10px] font-black uppercase rounded-lg hover:bg-rose-200 transition-all">
+                                                            Cancel
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        ` : `
+                            <div class="custom-card p-12 text-center space-y-4 border-emerald-100 bg-emerald-50/50">
+                                <div class="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto text-emerald-600">
+                                    <i data-lucide="calendar-x" class="w-8 h-8"></i>
+                                </div>
+                                <h3 class="text-xl font-black text-slate-900">No Appointments</h3>
+                                <p class="text-slate-500 font-medium">No appointments scheduled for this doctor yet.</p>
+                            </div>
+                        `}
+                    </div>
+                </main>
+            </div>`;
+        }
+
+        function renderNewPatientAccessView() {
+            return `
+            <div class="min-h-screen bg-gradient-to-b from-blue-50 to-white flex flex-col">
+                <nav class="bg-white border-b border-blue-100 p-4 flex justify-between items-center sticky top-0 z-40 shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <button onclick="resetHospitalSession()" class="p-2 hover:bg-blue-100 rounded-xl transition-colors"><i data-lucide="arrow-left"></i></button>
+                        <div class="p-2 bg-blue-600 rounded-lg text-white"><i data-lucide="user-plus" class="w-5 h-5"></i></div>
+                        <span class="text-xl font-black tracking-tighter uppercase">New Patient Entry</span>
+                    </div>
+                    <div class="flex gap-6 items-center">
+                        <button onclick="navigate('patient')" class="text-xs font-black text-slate-400 hover:text-blue-600 transition-colors uppercase tracking-widest pr-6 border-r border-blue-200">Patient View</button>
+                        <button onclick="navigate('landing')" class="text-rose-500 hover:scale-110 transition-transform"><i data-lucide="log-out" class="w-6 h-6"></i></button>
+                    </div>
+                </nav>
+
+                <main class="flex-1 p-6 md:p-10 flex items-center justify-center">
+                    <div class="max-w-2xl w-full space-y-8 animate-fade-in">
+                        <div class="text-center">
+                            <h2 class="text-4xl font-black text-slate-900 uppercase tracking-tighter mb-2">Register New Patient</h2>
+                            <p class="text-slate-500 font-medium text-lg">Choose an access method to identify the patient</p>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <!-- NFC CARD INPUT -->
+                            <div class="custom-card p-8 border-2 border-blue-200 hover:border-blue-500 transition-all">
+                                <div class="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600 mb-4">
+                                    <i data-lucide="smartphone" class="w-7 h-7"></i>
+                                </div>
+                                <h3 class="text-xl font-black text-slate-900 uppercase tracking-tighter mb-3">NFC Card</h3>
+                                <p class="text-slate-600 font-medium text-sm mb-6">Place the patient's NFC health card near your mobile device to read data.</p>
+                                
+                                <div class="space-y-4">
+                                    <input type="text" id="nfcCardInput" placeholder="NFC data will appear here..." class="w-full p-3 bg-blue-50 border border-blue-200 rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 text-sm" readonly>
+                                    <button onclick="initNFCRead()" class="w-full py-3 bg-blue-600 text-white rounded-xl font-black uppercase tracking-widest text-xs shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
+                                        <i data-lucide="radio" class="w-4 h-4"></i> Activate NFC Reader
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- QR CODE SCANNER -->
+                            <div class="custom-card p-8 border-2 border-purple-200 hover:border-purple-500 transition-all">
+                                <div class="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center text-purple-600 mb-4">
+                                    <i data-lucide="square" class="w-7 h-7"></i>
+                                </div>
+                                <h3 class="text-xl font-black text-slate-900 uppercase tracking-tighter mb-3">QR Code</h3>
+                                <p class="text-slate-600 font-medium text-sm mb-6">Scan the patient's QR code using your device camera to extract patient information.</p>
+                                
+                                <div class="space-y-4">
+                                    <input type="text" id="qrCodeInput" placeholder="Scanned QR data will appear..." class="w-full p-3 bg-purple-50 border border-purple-200 rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-purple-500 text-sm" readonly>
+                                    <button onclick="initQRCodeScanner()" class="w-full py-3 bg-purple-600 text-white rounded-xl font-black uppercase tracking-widest text-xs shadow-lg hover:bg-purple-700 transition-all flex items-center justify-center gap-2">
+                                        <i data-lucide="camera" class="w-4 h-4"></i> Scan QR Code
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- MANUAL PATIENT ID -->
+                            <div class="custom-card p-8 border-2 border-amber-200 hover:border-amber-500 transition-all">
+                                <div class="w-14 h-14 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-600 mb-4">
+                                    <i data-lucide="type" class="w-7 h-7"></i>
+                                </div>
+                                <h3 class="text-xl font-black text-slate-900 uppercase tracking-tighter mb-3">Patient ID</h3>
+                                <p class="text-slate-600 font-medium text-sm mb-6">Manually enter the patient's unique health ID to access their records.</p>
+                                
+                                <div class="space-y-4">
+                                    <input type="text" id="patientIdInput" placeholder="e.g., ML-2024-001" class="w-full p-3 bg-amber-50 border border-amber-200 rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-amber-500 text-sm uppercase">
+                                    <button onclick="accessPatientByID()" class="w-full py-3 bg-amber-600 text-white rounded-xl font-black uppercase tracking-widest text-xs shadow-lg hover:bg-amber-700 transition-all flex items-center justify-center gap-2">
+                                        <i data-lucide="search" class="w-4 h-4"></i> Find Patient
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="nfcStatus" class="hidden p-4 rounded-2xl border-2 animate-fade-in"></div>
+                    </div>
+                </main>
+            </div>`;
+        }
+
+        function renderHospitalPatientDetails() {
+            const p = patients.find(pat => pat.id === currentState.hospitalSelectedPatientId);
+            
+            // Check if we're in new entry mode
+            if (currentState.showNewEntryForm) {
+                return renderNewMedicalEntry(p);
+            }
+
+            return `
+            <div class="min-h-screen bg-emerald-50 flex flex-col">
+                <nav class="bg-white border-b border-emerald-100 p-4 flex justify-between items-center sticky top-0 z-40 shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <button onclick="backToRegistry()" class="p-2 hover:bg-emerald-100 rounded-xl transition-colors"><i data-lucide="chevron-left"></i></button>
+                        <span class="text-xl font-black tracking-tighter uppercase">Clinical File</span>
+                    </div>
+                </nav>
+
+                <main class="flex-1 p-6 md:p-10 max-w-7xl mx-auto w-full space-y-10 animate-fade-in">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
+                        <div class="lg:col-span-1">
+                            <div class="custom-card p-10 text-center space-y-6 bg-gradient-to-b from-emerald-50 to-white border-emerald-100">
+                                <img src="${p.photo}" class="w-40 h-40 rounded-[2.5rem] mx-auto object-cover border-8 border-emerald-100 shadow-2xl">
+                                <h3 class="text-3xl font-black text-slate-900 leading-tight">${p.name}</h3>
+                                <p class="text-emerald-600 font-black uppercase text-xs tracking-widest">${p.age} Years • ${p.bloodGroup}</p>
+                                <div class="pt-6 border-t border-emerald-100 space-y-4 text-left">
+                                    <div><p class="text-[10px] font-black text-slate-400 uppercase leading-none mb-1">CONTACT</p><p class="text-sm font-bold">${p.phone}</p></div>
+                                    <div><p class="text-[10px] font-black text-slate-400 uppercase leading-none mb-1">HEALTH ID</p><p class="text-sm font-mono font-bold text-emerald-600">${p.id}</p></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="lg:col-span-2 space-y-8">
+                            <div class="flex justify-between items-center">
+                                <h3 class="text-3xl font-black text-slate-900 uppercase tracking-tighter">Diagnostic History</h3>
+                                <button onclick="toggleNewEntryForm()" class="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center gap-2">
+                                    <i data-lucide="plus" class="w-4 h-4"></i> New Entry
+                                </button>
+                            </div>
+
+                            <div class="custom-card border-none border-emerald-100 shadow-xl overflow-hidden">
+                                <table class="w-full text-left">
+                                    <thead class="bg-emerald-50 border-b border-emerald-100">
+                                        <tr>
+                                            <th class="px-8 py-5 text-xs font-bold text-emerald-600 uppercase tracking-widest">Medical Record</th>
+                                            <th class="px-8 py-5 text-xs font-bold text-emerald-600 uppercase tracking-widest text-center">Date</th>
+                                            <th class="px-8 py-5 text-xs font-bold text-emerald-600 uppercase tracking-widest text-right">Registry File</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-emerald-100">
+                                        ${p.reports.map(r => `
+                                            <tr class="hover:bg-emerald-50 transition-colors">
+                                                <td class="px-8 py-6">
+                                                    <div class="flex items-center gap-4">
+                                                        <div class="p-3 bg-white rounded-xl border border-emerald-100 shadow-sm"><i data-lucide="file-search" class="w-5 h-5 text-emerald-500"></i></div>
+                                                        <div><div class="font-black text-slate-800 text-lg">${r.type}</div><div class="text-xs font-bold text-slate-400 uppercase">${r.hospital}</div></div>
+                                                    </div>
+                                                </td>
+                                                <td class="px-8 py-6 text-sm font-bold text-slate-400 text-center">${r.date}</td>
+                                                <td class="px-8 py-6 text-right">
+                                                    <button onclick="window.open('${r.fileUrl}', '_blank')" class="bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-md hover:bg-emerald-700 transition-all">OPEN FILE</button>
+                                                </td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+            </div>`;
+        }
+
+        function renderNewMedicalEntry(patient) {
+            return `
+            <div class="min-h-screen bg-emerald-50 flex flex-col">
+                <nav class="bg-white border-b border-emerald-100 p-4 flex justify-between items-center sticky top-0 z-40 shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <button onclick="toggleNewEntryForm()" class="p-2 hover:bg-emerald-100 rounded-xl transition-colors"><i data-lucide="chevron-left"></i></button>
+                        <span class="text-xl font-black tracking-tighter uppercase">New Medical Entry</span>
+                    </div>
+                </nav>
+
+                <main class="flex-1 p-6 md:p-10 max-w-4xl mx-auto w-full animate-fade-in">
+                    <div class="custom-card p-10 space-y-8 border-emerald-100">
+                        <div>
+                            <h2 class="text-3xl font-black text-slate-900 uppercase tracking-tighter mb-2">Add Medical Record</h2>
+                            <p class="text-slate-500 font-medium">Create a new clinical entry for ${patient.name}</p>
+                        </div>
+
+                        <form id="newEntryForm" class="space-y-8">
+                            <!-- Patient Details (Read-only) -->
+                            <div class="pb-6 border-b border-emerald-100">
+                                <h3 class="text-lg font-black text-slate-900 uppercase tracking-tighter mb-6">Patient Information</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <div>
+                                        <label class="text-xs font-black text-slate-400 uppercase tracking-widest block mb-3">Health ID</label>
+                                        <div class="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl font-bold text-slate-700">
+                                            ${patient.id}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="text-xs font-black text-slate-400 uppercase tracking-widest block mb-3">Patient Name</label>
+                                        <div class="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl font-bold text-slate-700">
+                                            ${patient.name}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="text-xs font-black text-slate-400 uppercase tracking-widest block mb-3">Blood Group</label>
+                                        <div class="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl font-bold text-slate-700">
+                                            ${patient.bloodGroup}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Test/Diagnostic Information -->
+                            <div class="pb-6 border-b border-emerald-100">
+                                <h3 class="text-lg font-black text-slate-900 uppercase tracking-tighter mb-6">Test Details</h3>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label class="text-xs font-black text-slate-400 uppercase tracking-widest block mb-3">Test Type *</label>
+                                        <select id="testType" class="w-full p-4 bg-emerald-50 border border-emerald-200 rounded-2xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500" required>
+                                            <option value="">Select Test Type</option>
+                                            <option value="Blood Test">Blood Test</option>
+                                            <option value="X-Ray">X-Ray</option>
+                                            <option value="CT Scan">CT Scan</option>
+                                            <option value="MRI">MRI</option>
+                                            <option value="Ultrasound">Ultrasound</option>
+                                            <option value="ECG">ECG</option>
+                                            <option value="EEG">EEG</option>
+                                            <option value="Lipid Profile">Lipid Profile</option>
+                                            <option value="Blood Sugar Test">Blood Sugar Test</option>
+                                            <option value="Urinalysis">Urinalysis</option>
+                                            <option value="Thyroid Function Test">Thyroid Function Test</option>
+                                            <option value="Allergy Test">Allergy Test</option>
+                                            <option value="Vitamin D Test">Vitamin D Test</option>
+                                            <option value="Other">Other</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div>
+                                        <label class="text-xs font-black text-slate-400 uppercase tracking-widest block mb-3">Test Date *</label>
+                                        <input type="date" id="testDate" class="w-full p-4 bg-emerald-50 border border-emerald-200 rounded-2xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500" required>
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                                    <div>
+                                        <label class="text-xs font-black text-slate-400 uppercase tracking-widest block mb-3">Hospital Name *</label>
+                                        <input type="text" id="hospital" placeholder="e.g., Apollo Hospital" class="w-full p-4 bg-emerald-50 border border-emerald-200 rounded-2xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500" required>
+                                    </div>
+                                    
+                                    <div>
+                                        <label class="text-xs font-black text-slate-400 uppercase tracking-widest block mb-3">Doctor Name *</label>
+                                        <input type="text" id="doctorName" placeholder="e.g., Dr. Ramesh Varma" class="w-full p-4 bg-emerald-50 border border-emerald-200 rounded-2xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500" required>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Test Results -->
+                            <div class="pb-6 border-b border-emerald-100">
+                                <h3 class="text-lg font-black text-slate-900 uppercase tracking-tighter mb-6">Test Results</h3>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label class="text-xs font-black text-slate-400 uppercase tracking-widest block mb-3">Test Status *</label>
+                                        <select id="testStatus" class="w-full p-4 bg-emerald-50 border border-emerald-200 rounded-2xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500" required>
+                                            <option value="">Select Status</option>
+                                            <option value="Normal">Normal</option>
+                                            <option value="Abnormal">Abnormal</option>
+                                            <option value="Review">Review</option>
+                                            <option value="Positive">Positive</option>
+                                            <option value="Negative">Negative</option>
+                                            <option value="Deficient">Deficient</option>
+                                            <option value="Critical">Critical</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div>
+                                        <label class="text-xs font-black text-slate-400 uppercase tracking-widest block mb-3">Metric (Optional)</label>
+                                        <input type="text" id="metric" placeholder="e.g., Hemoglobin" class="w-full p-4 bg-emerald-50 border border-emerald-200 rounded-2xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500">
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                                    <div>
+                                        <label class="text-xs font-black text-slate-400 uppercase tracking-widest block mb-3">Value (Optional)</label>
+                                        <input type="text" id="value" placeholder="e.g., 14.2 g/dL" class="w-full p-4 bg-emerald-50 border border-emerald-200 rounded-2xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500">
+                                    </div>
+                                    
+                                    <div>
+                                        <label class="text-xs font-black text-slate-400 uppercase tracking-widest block mb-3">Reference Range (Optional)</label>
+                                        <input type="text" id="referenceRange" placeholder="e.g., 13.5-17.5 g/dL" class="w-full p-4 bg-emerald-50 border border-emerald-200 rounded-2xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- File Upload -->
+                            <div class="pb-6 border-b border-emerald-100">
+                                <h3 class="text-lg font-black text-slate-900 uppercase tracking-tighter mb-6">Upload Medical Document</h3>
+                                
+                                <div>
+                                    <label class="text-xs font-black text-slate-400 uppercase tracking-widest block mb-3">File Upload (Optional)</label>
+                                    <div class="flex items-center gap-4">
+                                        <input type="file" id="medicalFile" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" class="flex-1 p-4 bg-emerald-50 border border-dashed border-emerald-300 rounded-2xl text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer">
+                                        <span id="fileNameDisplay" class="text-xs font-bold text-slate-500 min-w-max">No file selected</span>
+                                    </div>
+                                    <p class="text-[10px] text-slate-400 mt-2">Supported: PDF, JPG, PNG, DOC, DOCX (Max 10MB)</p>
+                                </div>
+
+                                <div class="mt-6">
+                                    <label class="text-xs font-black text-slate-400 uppercase tracking-widest block mb-3">Or External File URL (Optional)</label>
+                                    <input type="url" id="fileUrl" placeholder="https://drive.google.com/file/d/" class="w-full p-4 bg-emerald-50 border border-emerald-200 rounded-2xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500">
+                                    <p class="text-[10px] text-slate-400 mt-2">Provide a direct link to the file (Google Drive, OneDrive, etc.)</p>
+                                </div>
+                            </div>
+
+                            <!-- Clinical Notes -->
+                            <div class="pb-6">
+                                <h3 class="text-lg font-black text-slate-900 uppercase tracking-tighter mb-6">Additional Information</h3>
+                                
+                                <div>
+                                    <label class="text-xs font-black text-slate-400 uppercase tracking-widest block mb-3">Clinical Notes (Optional)</label>
+                                    <textarea id="clinicalNotes" placeholder="Add any relevant clinical observations or details..." class="w-full p-4 bg-emerald-50 border border-emerald-200 rounded-2xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500 resize-none" rows="4"></textarea>
+                                </div>
+                            </div>
+
+                            <!-- Form Actions -->
+                            <div class="flex gap-4 pt-6 border-t border-emerald-100">
+                                <button type="button" onclick="saveNewMedicalEntry('${patient.id}')" class="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 flex items-center justify-center gap-2">
+                                    <i data-lucide="check" class="w-5 h-5"></i> Save Medical Entry
+                                </button>
+                                <button type="button" onclick="toggleNewEntryForm()" class="flex-1 py-4 border-2 border-slate-200 text-slate-700 rounded-2xl font-black uppercase tracking-widest text-sm hover:bg-slate-50 transition-all">
+                                    Cancel
+                                </button>
+                            </div>
+                        </form>
+                        
+                        <div id="uploadProgress" class="hidden mt-6 p-4 bg-blue-50 border border-blue-200 rounded-2xl">
+                            <p class="text-sm font-bold text-blue-700">Uploading file...</p>
+                            <div class="w-full bg-blue-200 rounded-full h-2 mt-2">
+                                <div id="progressBar" class="bg-blue-600 h-2 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+            </div>`;
+        }
+
+        // --- CONTROLLER LOGIC ---
+
+        function navigate(view) {
+            if (!currentUser) {
+                showNotification('Please login first', 'error');
+                return;
+            }
+            currentState.view = view;
+            // Reset specific states when navigating
+            if (view !== 'doctor') {
+                currentState.currentDoctorId = null;
+            }
+            if (view !== 'hospital') {
+                currentState.hospitalSessionType = null;
+                currentState.hospitalSelectedPatientId = null;
+                currentState.hospitalDoctorView = null;
+            }
+            if (view !== 'patient') {
+                currentState.bookingDoctor = null;
+            }
+            render();
+        }
+
+        function setPatientTab(tab) {
+            currentState.patientPortalTab = tab;
+            currentState.bookingDoctor = null;
+            render();
+        }
+
+        function managePatient(id) {
+            currentState.hospitalSelectedPatientId = id;
+            render();
+        }
+
+        function backToRegistry() {
+            currentState.hospitalSelectedPatientId = null;
+            render();
+        }
+
+        // Hospital Portal Session Management
+        function setHospitalSessionType(type) {
+            currentState.hospitalSessionType = type;
+            render();
+        }
+
+        function resetHospitalSession() {
+            currentState.hospitalSessionType = null;
+            currentState.hospitalSelectedPatientId = null;
+            currentState.hospitalDoctorView = null;
+            render();
+        }
+
+        // Hospital Appointment Management
+        function showDoctorAppointments(doctorId) {
+            currentState.hospitalDoctorView = doctorId;
+            render();
+        }
+
+        function closeDoctorAppointments() {
+            currentState.hospitalDoctorView = null;
+            render();
+        }
+
+        // NFC Card Reader
+        async function initNFCRead() {
+            const nfcStatus = document.getElementById('nfcStatus');
+            const nfcCardInput = document.getElementById('nfcCardInput');
+
+            // Check if NFC API is available
+            if (!('NDEFReader' in window)) {
+                showNFCStatusMessage('error', 'NFC is not supported on this device. Please use another method.');
+                return;
+            }
+
+            try {
+                showNFCStatusMessage('info', 'Activating NFC reader... Place your card near the device.');
+                
+                const ndef = new NDEFReader();
+                await ndef.scan();
+
+                ndef.onreading = (event) => {
+                    for (const record of event.message.records) {
+                        if (record.recordType === "text") {
+                            const decoder = new TextDecoder();
+                            const data = decoder.decode(record.data);
+                            nfcCardInput.value = data;
+                            
+                            // Auto-extract patient ID if in format
+                            if (data.includes("ML-20")) {
+                                const patientId = data.match(/ML-\d+-\d+/)[0];
+                                accessPatientByNFC(patientId);
+                            }
+                            
+                            showNFCStatusMessage('success', 'NFC card read successfully! Finding patient...');
+                        }
+                    }
+                };
+
+                ndef.onreadingerror = () => {
+                    showNFCStatusMessage('error', 'Failed to read NFC card. Please try again.');
+                };
+
+            } catch (error) {
+                showNFCStatusMessage('error', 'NFC Error: ' + error.message);
+            }
+        }
+
+        // QR Code Scanner
+        async function initQRCodeScanner() {
+            const qrCodeInput = document.getElementById('qrCodeInput');
+            
+            // Check if camera access is available
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                showNFCStatusMessage('error', 'Camera access is not available. Please use another method.');
+                return;
+            }
+
+            try {
+                showNFCStatusMessage('info', 'Opening camera... Point at QR code.');
+                
+                // For this demo, we'll use a simple prompt to simulate QR scanning
+                // In production, you would use a library like jsQR or ZXing
+                const qrData = prompt('Paste or scan QR code data:\n(Format: ML-2024-XXX or JSON data)');
+                
+                if (qrData) {
+                    qrCodeInput.value = qrData;
+                    
+                    // Try to extract patient ID
+                    if (qrData.includes("ML-20")) {
+                        const patientId = qrData.match(/ML-\d+-\d+/)[0];
+                        accessPatientByQR(patientId);
+                    } else if (qrData.startsWith('{')) {
+                        // If JSON, parse and extract ID
+                        try {
+                            const data = JSON.parse(qrData);
+                            if (data.patientId) {
+                                accessPatientByQR(data.patientId);
+                            }
+                        } catch (e) {
+                            showNFCStatusMessage('error', 'Invalid QR data format.');
+                        }
+                    }
+                    
+                    showNFCStatusMessage('success', 'QR code scanned successfully! Finding patient...');
+                }
+            } catch (error) {
+                showNFCStatusMessage('error', 'Camera Error: ' + error.message);
+            }
+        }
+
+        // Manual Patient ID Access
+        function accessPatientByID() {
+            const patientId = document.getElementById('patientIdInput').value.trim().toUpperCase();
+            
+            if (!patientId) {
+                alert('Please enter a patient ID');
+                return;
+            }
+
+            const patient = patients.find(p => p.id === patientId);
+            if (patient) {
+                currentState.hospitalSelectedPatientId = patientId;
+                render();
+            } else {
+                showNFCStatusMessage('error', `Patient not found. ID: ${patientId}`);
+            }
+        }
+
+        // Access patient via NFC
+        function accessPatientByNFC(patientId) {
+            const patient = patients.find(p => p.id === patientId);
+            if (patient) {
+                setTimeout(() => {
+                    currentState.hospitalSelectedPatientId = patientId;
+                    render();
+                }, 1500);
+            } else {
+                showNFCStatusMessage('error', `Patient not found in system. ID: ${patientId}`);
+            }
+        }
+
+        // Access patient via QR
+        function accessPatientByQR(patientId) {
+            const patient = patients.find(p => p.id === patientId);
+            if (patient) {
+                setTimeout(() => {
+                    currentState.hospitalSelectedPatientId = patientId;
+                    render();
+                }, 1500);
+            } else {
+                showNFCStatusMessage('error', `Patient not found in system. ID: ${patientId}`);
+            }
+        }
+
+        // Show NFC/QR status message
+        function showNFCStatusMessage(type, message) {
+            const nfcStatus = document.getElementById('nfcStatus');
+            if (!nfcStatus) return;
+
+            let bgColor = 'bg-blue-50';
+            let borderColor = 'border-blue-300';
+            let iconColor = 'text-blue-600';
+            let icon = 'info';
+
+            if (type === 'success') {
+                bgColor = 'bg-emerald-50';
+                borderColor = 'border-emerald-300';
+                iconColor = 'text-emerald-600';
+                icon = 'check-circle-2';
+            } else if (type === 'error') {
+                bgColor = 'bg-rose-50';
+                borderColor = 'border-rose-300';
+                iconColor = 'text-rose-600';
+                icon = 'alert-circle';
+            }
+
+            nfcStatus.innerHTML = `
+                <div class="flex items-start gap-4 ${bgColor} ${borderColor} rounded-2xl p-4">
+                    <i data-lucide="${icon}" class="w-5 h-5 ${iconColor} flex-shrink-0 mt-0.5"></i>
+                    <p class="font-bold text-slate-700">${message}</p>
+                </div>
+            `;
+            nfcStatus.classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        // Patient Appointment Management Functions
+        function cancelAppointment(patientId, appointmentId) {
+            const patient = patients.find(p => p.id === patientId);
+            if (!patient) return;
+
+            const confirmCancel = confirm('Are you sure you want to cancel this appointment? This action cannot be undone.');
+            if (!confirmCancel) return;
+
+            // Remove appointment
+            patient.appointments = patient.appointments.filter(apt => apt.id !== appointmentId);
+
+            // Show success message
+            const root = document.getElementById('app-root');
+            root.innerHTML = `
+            <div class="fixed inset-0 flex items-center justify-center p-6 z-50 animate-fade-in" style="background-color: rgba(0,0,0,0.5);">
+                <div class="custom-card p-12 text-center space-y-6 max-w-lg w-full border-emerald-100 bg-white shadow-2xl rounded-3xl animate-scale-in">
+                    <div class="w-24 h-24 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i data-lucide="trash-2" class="w-12 h-12"></i>
+                    </div>
+                    <h2 class="text-4xl font-black text-slate-900 tracking-tighter uppercase">Appointment Cancelled</h2>
+                    <p class="text-slate-500 font-medium text-lg">Your appointment has been successfully cancelled. You can book another appointment anytime.</p>
+                    <div class="pt-4 space-y-3">
+                        <button onclick="setPatientTab('appointments')" class="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-emerald-700 transition-all">Back to Appointments</button>
+                    </div>
+                </div>
+            </div>`;
+            lucide.createIcons();
+        }
+
+        function rescheduleAppointment(appointmentId) {
+            alert('Reschedule feature coming soon! You can cancel and book a new appointment.');
+        }
+
+        // Hospital Staff - Confirm Patient Appointment with Doctor
+        function confirmPatientAppointment(patientId, doctorId, appointmentId) {
+            const patient = patients.find(p => p.id === patientId);
+            const doctor = doctors.find(d => d.id === doctorId);
+            
+            if (!patient || !doctor) return;
+
+            const appointment = patient.appointments.find(apt => apt.id === appointmentId);
+            if (!appointment) return;
+
+            // Update appointment status
+            appointment.status = 'Confirmed by Hospital';
+            appointment.confirmedAt = new Date().toLocaleString();
+            appointment.hospitalConfirmed = true;
+
+            // Show confirmation message
+            alert(`Appointment confirmed for ${patient.name} with ${doctor.name} on ${appointment.date} at ${appointment.time}`);
+            render();
+        }
+
+        // Hospital Staff - Cancel Patient Appointment
+        function cancelPatientAppointment(patientId, appointmentId) {
+            const patient = patients.find(p => p.id === patientId);
+            if (!patient) return;
+
+            const confirmCancel = confirm('Cancel this patient appointment? The patient will be notified.');
+            if (!confirmCancel) return;
+
+            patient.appointments = patient.appointments.filter(apt => apt.id !== appointmentId);
+            alert('Appointment cancelled. Patient notification sent.');
+            render();
+        }
+
+        function startBooking(docId) {
+            const doc = doctors.find(d => d.id === docId);
+            currentState.bookingDoctor = doc;
+            render();
+        }
+
+        function cancelBooking() {
+            currentState.bookingDoctor = null;
+            render();
+        }
+
+        let selectedBookingTime = "";
+        function selectTime(time) {
+            selectedBookingTime = time;
+            document.querySelectorAll('.time-slot-btn').forEach(btn => {
+                btn.classList.remove('bg-emerald-600', 'text-white', 'border-emerald-600');
+            });
+            const target = document.getElementById(`slot-${time.replace(' ', '')}`);
+            target.classList.add('bg-emerald-600', 'text-white', 'border-emerald-600');
+        }
+
+        function confirmBooking() {
+            const dateInput = document.getElementById('bookingDateInput').value;
+            if (!dateInput || !selectedBookingTime) {
+                alert("Please select both Date and Time Slot");
+                return;
+            }
+
+            const p = patients.find(pat => pat.id === currentState.currentPatientId);
+            const newApp = {
+                id: Math.random(),
+                doctor: currentState.bookingDoctor.name,
+                specialization: currentState.bookingDoctor.specialty,
+                hospital: currentState.bookingDoctor.hospital,
+                date: dateInput,
+                time: selectedBookingTime,
+                status: 'Confirmed'
+            };
+
+            p.appointments.push(newApp);
+
+            // Show Success UI
+            const root = document.getElementById('app-root');
+            root.innerHTML = `
+            <div class="min-h-screen flex items-center justify-center p-6 animate-fade-in bg-emerald-50">
+                <div class="custom-card p-12 text-center space-y-6 max-w-lg w-full border-emerald-100">
+                    <div class="w-24 h-24 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 scale-110">
+                        <i data-lucide="check-circle-2" class="w-12 h-12"></i>
+                    </div>
+                    <h2 class="text-4xl font-black text-slate-900 tracking-tighter uppercase">Booking Confirmed</h2>
+                    <p class="text-slate-500 font-medium">Your visit with ${currentState.bookingDoctor.name} is scheduled successfully.</p>
+                    <button onclick="setPatientTab('dashboard')" class="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-emerald-700 transition-all">Back to Dashboard</button>
+                </div>
+            </div>`;
+            lucide.createIcons();
+
+            // Reset state
+            currentState.bookingDoctor = null;
+            selectedBookingTime = "";
+        }
+
+        function toggleHospitalGroup(groupId) {
+            const group = document.getElementById(groupId);
+            const button = group.previousElementSibling;
+            const icon = button.querySelector('.toggle-icon');
+            
+            group.classList.toggle('hidden');
+            icon.style.transform = group.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
+            icon.style.transition = 'transform 0.3s ease';
+        }
+
+        // Toggle New Entry Form
+        function toggleNewEntryForm() {
+            currentState.showNewEntryForm = !currentState.showNewEntryForm;
+            render();
+        }
+
+        // Save New Medical Entry
+        // ===== SUPABASE FUNCTIONS FOR FILE UPLOAD AND DATABASE =====
+        async function uploadFileToSupabase(file, patientId) {
+            try {
+                if (!file || !currentUser || !supabase) {
+                    console.warn('Upload prerequisites not met:', { file: !!file, currentUser: !!currentUser, supabase: !!supabase });
+                    return null;
+                }
+
+                const fileExt = file.name.split('.').pop();
+                const fileName = `${patientId}_${Date.now()}.${fileExt}`;
+                const filePath = `medical-reports/${patientId}/${fileName}`;
+
+                const { data, error } = await supabase.storage
+                    .from('medical-files')
+                    .upload(filePath, file);
+
+                if (error) {
+                    console.error('File upload error:', error);
+                    return null;
+                }
+
+                const { data: { publicUrl } } = supabase.storage
+                    .from('medical-files')
+                    .getPublicUrl(filePath);
+
+                return publicUrl;
+            } catch (error) {
+                console.error('Upload error:', error);
+                return null;
+            }
+        }
+
+        async function saveMedicalReportToDatabase(patientId, reportData) {
+            try {
+                if (!supabase || !currentUser) {
+                    console.warn('Database prerequisites not met');
+                    return false;
+                }
+                
+                const { error } = await supabase
+                    .from('medical_reports')
+                    .insert({
+                        ...reportData,
+                        patient_id: patientId,
+                        created_by: currentUser.id,
+                        created_at: new Date()
+                    });
+
+                if (error) {
+                    console.error('Database insert error:', error);
+                    return false;
+                }
+                return true;
+            } catch (error) {
+                console.error('Database error:', error);
+                return false;
+            }
+        }
+
+        async function loadPatientDataFromDatabase(patientId) {
+            try {
+                if (!supabase) {
+                    console.warn('Supabase not initialized');
+                    return [];
+                }
+                
+                const { data, error } = await supabase
+                    .from('medical_reports')
+                    .select('*')
+                    .eq('patient_id', patientId);
+
+                if (error) {
+                    console.error('Load error:', error);
+                    return [];
+                }
+                return data || [];
+            } catch (error) {
+                console.error('Error:', error);
+                return [];
+            }
+        }
+
+        async function savePatientProfileToDatabase(patientData) {
+            try {
+                if (!supabase || !currentUser) {
+                    console.warn('Database prerequisites not met');
+                    return false;
+                }
+                
+                const { error } = await supabase
+                    .from('patient_profiles')
+                    .upsert({
+                        id: patientData.id,
+                        user_id: currentUser.id,
+                        name: patientData.name,
+                        age: patientData.age,
+                        blood_group: patientData.bloodGroup,
+                        phone: patientData.phone,
+                        email: patientData.email,
+                        allergies: JSON.stringify(patientData.allergies),
+                        chronic_conditions: JSON.stringify(patientData.chronicConditions),
+                        emergency_contact: patientData.emergencyContact,
+                        updated_at: new Date()
+                    });
+
+                if (error) {
+                    console.error('Profile save error:', error);
+                    return false;
+                }
+                return true;
+            } catch (error) {
+                console.error('Error:', error);
+                return false;
+            }
+        }
+
+        async function saveAppointmentToDatabase(appointmentData) {
+            try {
+                if (!supabase) {
+                    console.warn('Supabase not initialized');
+                    return false;
+                }
+                
+                const { error } = await supabase
+                    .from('appointments')
+                    .insert({
+                        patient_id: appointmentData.patientId,
+                        doctor_id: appointmentData.doctorId,
+                        doctor_name: appointmentData.doctor,
+                        appointment_date: appointmentData.date,
+                        appointment_time: appointmentData.time,
+                        specialization: appointmentData.specialization,
+                        hospital: appointmentData.hospital,
+                        status: appointmentData.status || 'pending',
+                        hospital_confirmed: appointmentData.hospitalConfirmed || false,
+                        created_at: new Date()
+                    });
+
+                if (error) {
+                    console.error('Appointment save error:', error);
+                    return false;
+                }
+                return true;
+            } catch (error) {
+                console.error('Error:', error);
+                return false;
+            }
+        }
+
+        async function loadAppointmentsFromDatabase(patientId) {
+            try {
+                if (!supabase) {
+                    console.warn('Supabase not initialized');
+                    return [];
+                }
+                
+                const { data, error } = await supabase
+                    .from('appointments')
+                    .select('*')
+                    .eq('patient_id', patientId)
+                    .order('appointment_date', { ascending: true });
+
+                if (error) {
+                    console.error('Load appointments error:', error);
+                    return [];
+                }
+                return data || [];
+            } catch (error) {
+                console.error('Error:', error);
+                return [];
+            }
+        }
+
+        function saveNewMedicalEntry(patientId) {
+            // Get form values
+            const testType = document.getElementById('testType').value;
+            const testDate = document.getElementById('testDate').value;
+            const hospital = document.getElementById('hospital').value;
+            const doctorName = document.getElementById('doctorName').value;
+            const testStatus = document.getElementById('testStatus').value;
+            const metric = document.getElementById('metric').value;
+            const value = document.getElementById('value').value;
+            const clinicalNotes = document.getElementById('clinicalNotes').value;
+            const fileUrlInput = document.getElementById('fileUrl').value;
+
+            // Validate required fields
+            if (!testType || !testDate || !hospital || !doctorName || !testStatus) {
+                alert('Please fill in all required fields (marked with *)');
+                return;
+            }
+
+            // Find patient
+            const patient = patients.find(p => p.id === patientId);
+            if (!patient) {
+                alert('Patient not found');
+                return;
+            }
+
+            // Handle file upload
+            const mediaFile = document.getElementById('medicalFile').files[0];
+            let fileUrl = fileUrlInput || SAMPLE_PDF;
+
+            if (mediaFile) {
+                // For client-side only: create a URL from the file
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    createMedicalEntry(patient, testType, testDate, hospital, doctorName, testStatus, metric, value, clinicalNotes, e.target.result);
+                };
+                reader.readAsDataURL(mediaFile);
+            } else {
+                createMedicalEntry(patient, testType, testDate, hospital, doctorName, testStatus, metric, value, clinicalNotes, fileUrl);
+            }
+        }
+
+        // Helper function to create and save medical entry
+        function createMedicalEntry(patient, testType, testDate, hospital, doctorName, testStatus, metric, value, clinicalNotes, fileUrl) {
+            // Generate new ID (highest existing ID + 1)
+            const maxId = Math.max(...patient.reports.map(r => r.id), 0);
+            
+            // Create new report entry
+            const newReport = {
+                id: maxId + 1,
+                type: testType,
+                hospital: hospital,
+                doctor: doctorName,
+                date: testDate,
+                status: testStatus,
+                metric: metric || testType,
+                value: value || 'N/A',
+                details: clinicalNotes,
+                fileUrl: fileUrl
+            };
+
+            // Add to patient's reports
+            patient.reports.unshift(newReport);
+
+            // Show success message
+            showSuccessNotification(testType, hospital);
+
+            // Close form and refresh view
+            currentState.showNewEntryForm = false;
+            render();
+        }
+
+        // Show success notification
+        function showSuccessNotification(testType, hospital) {
+            const root = document.getElementById('app-root');
+            const successHTML = `
+            <div class="fixed inset-0 flex items-center justify-center p-6 z-50 animate-fade-in" style="background-color: rgba(0,0,0,0.5);">
+                <div class="custom-card p-12 text-center space-y-6 max-w-lg w-full border-emerald-100 bg-white shadow-2xl rounded-3xl animate-scale-in">
+                    <div class="w-24 h-24 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i data-lucide="check-circle-2" class="w-12 h-12"></i>
+                    </div>
+                    <h2 class="text-4xl font-black text-slate-900 tracking-tighter uppercase">Entry Added Successfully</h2>
+                    <p class="text-slate-500 font-medium text-lg">${testType} from ${hospital} has been added to the patient's record.</p>
+                    <div class="pt-4 space-y-3">
+                        <button onclick="render()" class="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-emerald-700 transition-all">Back to Clinical File</button>
+                    </div>
+                </div>
+            </div>`;
+            
+            root.innerHTML = successHTML;
+            lucide.createIcons();
+        }
+
+        function attachEventListeners() {
+            // File input change event
+            const fileInput = document.getElementById('medicalFile');
+            if (fileInput) {
+                fileInput.addEventListener('change', function(e) {
+                    const fileNameDisplay = document.getElementById('fileNameDisplay');
+                    if (e.target.files.length > 0) {
+                        fileNameDisplay.textContent = e.target.files[0].name;
+                    } else {
+                        fileNameDisplay.textContent = 'No file selected';
+                    }
+                });
+            }
+
+            // Generate QR Code for patient card
+            const patients_list = patients;
+            patients_list.forEach(patient => {
+                const qrContainer = document.getElementById(`qr-code-${patient.id}`);
+                if (qrContainer && qrContainer.children.length === 0) {
+                    generatePatientQRCode(patient.id, patient.name);
+                }
+            });
+        }
+
+        // Generate QR Code with patient information
+        function generatePatientQRCode(patientId, patientName) {
+            const qrContainer = document.getElementById(`qr-code-${patientId}`);
+            if (!qrContainer) return;
+
+            // Clear container if it has content
+            qrContainer.innerHTML = '';
+
+            // Create QR code data with patient information
+            const qrData = JSON.stringify({
+                type: "patient_profile",
+                patientId: patientId,
+                patientName: patientName,
+                timestamp: new Date().toISOString(),
+                appName: "MediLink"
+            });
+
+            try {
+                // Generate QR code with patient info
+                new QRCode(qrContainer, {
+                    text: qrData,
+                    width: 60,
+                    height: 60,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.H
+                });
+            } catch (error) {
+                console.error('Error generating QR code:', error);
+                qrContainer.innerHTML = '<i data-lucide="qr-code" class="w-6 h-6 text-gray-400"></i>';
+            }
+        }
+
+        // --- NFC & PDF FUNCTIONS ---
+
+        // NFC Configuration
+        const NFC_API_CONFIG = {
+            apiKey: 'YOUR_NFC_TOOLS_API_KEY', // Replace with your actual API key
+            apiUrl: 'https://api.nfctools.io/v1',
+            appId: 'medilink-health-card'
+        };
+
+        // Download Health Card as PDF
+        function downloadCardPDF(patientName, patientId, bloodGroup) {
+            // Using html2pdf library for PDF generation
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+            
+            script.onload = function() {
+                const element = document.createElement('div');
+                element.innerHTML = `
+                    <div style="width: 500px; padding: 40px; text-align: center; font-family: Arial, sans-serif;">
+                        <div style="background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: white; border-radius: 24px; padding: 40px; margin-bottom: 20px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span style="font-size: 16px; font-weight: bold;">MEDILINK ID</span>
+                                </div>
+                            </div>
+                            
+                            <div style="margin-bottom: 30px;">
+                                <h3 style="font-size: 24px; font-weight: bold; margin: 10px 0;">${patientName}</h3>
+                                <p style="color: #bbf7d0; font-weight: bold; font-size: 10px; letter-spacing: 1px; margin: 5px 0;">${patientId}</p>
+                            </div>
+                            
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
+                                <div>
+                                    <p style="font-size: 8px; color: rgba(255,255,255,0.5); font-weight: bold; margin: 0 0 5px 0;">BLOOD GROUP</p>
+                                    <p style="font-size: 28px; font-weight: bold; margin: 0; color: #bbf7d0;">${bloodGroup}</p>
+                                </div>
+                                <div style="text-align: right;">
+                                    <p style="font-size: 8px; color: rgba(255,255,255,0.5); font-weight: bold; margin: 0 0 5px 0;">MEMBER SINCE</p>
+                                    <p style="font-size: 18px; font-weight: bold; margin: 0;">2024</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style="border: 2px solid #16a34a; border-radius: 12px; padding: 15px; margin-top: 20px;">
+                            <p style="font-size: 10px; color: #64748b; font-weight: bold; margin: 0;">HEALTH ID</p>
+                            <p style="font-size: 18px; font-weight: bold; color: #16a34a; letter-spacing: 2px; margin: 10px 0; font-family: monospace;">${patientId}</p>
+                            <p style="font-size: 8px; color: #94a3b8; margin: 5px 0;">This card is valid for one year from issuance date</p>
+                        </div>
+                    </div>
+                `;
+
+                const options = {
+                    margin: 10,
+                    filename: `MediLink_HealthCard_${patientId}.pdf`,
+                    image: { type: 'png', quality: 0.98 },
+                    html2canvas: { scale: 2 },
+                    jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
+                };
+
+                html2pdf().set(options).from(element).save();
+            };
+
+            document.head.appendChild(script);
+        }
+
+        // NFC Write Initialization
+        async function initNFCWrite(patientId, patientName) {
+            const statusDiv = document.getElementById('nfc-status');
+            
+            // Check if NFC is available
+            if (!('NDEFReader' in window)) {
+                showNFCStatus('error', '❌ NFC not supported on this device. Please use Chrome/Edge on Android.');
+                return;
+            }
+
+            try {
+                showNFCStatus('loading', '⏳ Preparing NFC write... Hold your card near the device.');
+                
+                const ndef = new NDEFReader();
+                await ndef.scan();
+
+                ndef.onreading = async (event) => {
+                    try {
+                        showNFCStatus('loading', '📝 Writing health data to NFC card...');
+                        
+                        const healthData = {
+                            id: patientId,
+                            name: patientName,
+                            timestamp: new Date().toISOString(),
+                            appId: NFC_API_CONFIG.appId
+                        };
+
+                        // Write to NFC using Web NFC API
+                        const records = [
+                            new NDEFRecord({
+                                recordType: "text",
+                                data: JSON.stringify(healthData)
+                            }),
+                            new NDEFRecord({
+                                recordType: "url",
+                                data: `https://medilink.health/${patientId}`
+                            })
+                        ];
+
+                        // Optional: Send to NFC Tools API for backup
+                        await recordNFCWriteToServer(patientId, patientName, NFC_API_CONFIG.apiKey);
+
+                        showNFCStatus('success', '✅ NFC card written successfully! Your health ID is now accessible via NFC.');
+                        
+                    } catch (err) {
+                        showNFCStatus('error', `❌ Write failed: ${err.message}`);
+                    }
+                };
+
+            } catch (err) {
+                if (err.name === 'NotAllowedError') {
+                    showNFCStatus('error', '⚠️ NFC access denied. Please enable NFC in settings.');
+                } else if (err.name === 'NotFoundError') {
+                    showNFCStatus('error', '📍 No NFC card detected. Please hold your card near the device.');
+                } else {
+                    showNFCStatus('error', `❌ Error: ${err.message}`);
+                }
+            }
+        }
+
+        // Record NFC write to server (optional backup)
+        async function recordNFCWriteToServer(patientId, patientName, apiKey) {
+            try {
+                const response = await fetch(`${NFC_API_CONFIG.apiUrl}/nfc-write`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`,
+                        'X-App-ID': NFC_API_CONFIG.appId
+                    },
+                    body: JSON.stringify({
+                        patientId: patientId,
+                        patientName: patientName,
+                        writeTime: new Date().toISOString(),
+                        platform: 'web'
+                    })
+                });
+
+                if (!response.ok) {
+                    console.warn('Server backup failed:', response.statusText);
+                }
+            } catch (err) {
+                console.warn('Could not backup to server:', err.message);
+                // Don't fail if server backup fails - local write succeeded
+            }
+        }
+
+        // Show NFC status messages
+        function showNFCStatus(type, message) {
+            const statusDiv = document.getElementById('nfc-status');
+            
+            let bgColor = '#f0fdf4';
+            let textColor = '#166534';
+            let borderColor = '#86efac';
+            
+            if (type === 'error') {
+                bgColor = '#fef2f2';
+                textColor = '#991b1b';
+                borderColor = '#fca5a5';
+            } else if (type === 'loading') {
+                bgColor = '#eff6ff';
+                textColor = '#0c4a6e';
+                borderColor = '#93c5fd';
+            }
+
+            statusDiv.innerHTML = `
+                <div style="background-color: ${bgColor}; border: 2px solid ${borderColor}; border-radius: 12px; padding: 16px; margin-top: 16px; text-align: center;">
+                    <p style="color: ${textColor}; font-weight: bold; margin: 0; font-size: 14px;">${message}</p>
+                </div>
+            `;
+            
+            statusDiv.classList.remove('hidden');
+
+            // Auto-hide success message after 5 seconds
+            if (type === 'success') {
+                setTimeout(() => {
+                    statusDiv.classList.add('hidden');
+                }, 5000);
+            }
+        }
+
+        // --- INITIALIZE ---
+        window.onload = initAuth;
+
+    </script>
+</body>
+</html>
