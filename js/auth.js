@@ -99,16 +99,17 @@ function redirectByRole(role) {
 function renderUserNav(profile, containerId) {
     const el = document.getElementById(containerId);
     if (!el || !profile) return;
+    el.style.marginLeft = 'auto';
     el.innerHTML = `
-        <div style="display:flex;align-items:center;gap:.75rem;">
-            <div style="text-align:right;" class="hide-mobile">
-                <div style="font-weight:800;font-size:.85rem;color:var(--slate-900)">${profile.full_name || profile.email}</div>
-                <div style="font-size:.7rem;color:var(--slate-400);text-transform:capitalize">${profile.role}</div>
-            </div>
-            <button onclick="logout()" class="btn btn-danger btn-sm" style="gap:.4rem">
+        <div style="display:flex;align-items:center;gap:1rem;">
+            <button onclick="logout()" class="btn btn-danger btn-sm" style="gap:.4rem;">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                 Logout
             </button>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;" class="hide-mobile">
+                <div style="font-weight:800;font-size:.85rem;color:var(--slate-900)">${profile.full_name || profile.email}</div>
+                <div style="font-size:.7rem;color:var(--slate-400);text-transform:capitalize">${profile.role}</div>
+            </div>
         </div>
     `;
 }

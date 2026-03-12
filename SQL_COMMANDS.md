@@ -129,6 +129,63 @@ CREATE POLICY "Anyone can view medical files"
 
 ---
 
+## Step 2.5: Enable RLS & Add Policies (REQUIRED)
+
+> **Without these policies, all table queries will return empty results!**
+
+```sql
+-- ============================================
+-- ENABLE RLS ON ALL TABLES
+-- ============================================
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE patients ENABLE ROW LEVEL SECURITY;
+ALTER TABLE doctors ENABLE ROW LEVEL SECURITY;
+ALTER TABLE medical_reports ENABLE ROW LEVEL SECURITY;
+ALTER TABLE appointments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE doctor_patients ENABLE ROW LEVEL SECURITY;
+
+-- ============================================
+-- PROFILES: users can read all profiles, update own
+-- ============================================
+CREATE POLICY "Anyone can read profiles" ON profiles FOR SELECT USING (true);
+CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
+
+-- ============================================
+-- PATIENTS: anyone can read, authenticated can insert/update
+-- ============================================
+CREATE POLICY "Anyone can read patients" ON patients FOR SELECT USING (true);
+CREATE POLICY "Authenticated can insert patients" ON patients FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Authenticated can update patients" ON patients FOR UPDATE TO authenticated USING (true);
+
+-- ============================================
+-- DOCTORS: anyone can read, authenticated can insert/update
+-- ============================================
+CREATE POLICY "Anyone can read doctors" ON doctors FOR SELECT USING (true);
+CREATE POLICY "Authenticated can insert doctors" ON doctors FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Authenticated can update doctors" ON doctors FOR UPDATE TO authenticated USING (true);
+
+-- ============================================
+-- MEDICAL_REPORTS: anyone can read, authenticated can insert
+-- ============================================
+CREATE POLICY "Anyone can read medical_reports" ON medical_reports FOR SELECT USING (true);
+CREATE POLICY "Authenticated can insert medical_reports" ON medical_reports FOR INSERT TO authenticated WITH CHECK (true);
+
+-- ============================================
+-- APPOINTMENTS: anyone can read, authenticated can insert/delete
+-- ============================================
+CREATE POLICY "Anyone can read appointments" ON appointments FOR SELECT USING (true);
+CREATE POLICY "Authenticated can insert appointments" ON appointments FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Authenticated can delete appointments" ON appointments FOR DELETE TO authenticated USING (true);
+
+-- ============================================
+-- DOCTOR_PATIENTS: anyone can read, authenticated can insert
+-- ============================================
+CREATE POLICY "Anyone can read doctor_patients" ON doctor_patients FOR SELECT USING (true);
+CREATE POLICY "Authenticated can insert doctor_patients" ON doctor_patients FOR INSERT TO authenticated WITH CHECK (true);
+```
+
+---
+
 ## Step 3: Insert Seed Data (Demo Doctors)
 
 ```sql

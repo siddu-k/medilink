@@ -13,9 +13,9 @@
 </head>
 
 <body style="background:var(--slate-50)">
-    <div class="navbar items-center justify-between" style="border-bottom-color:var(--slate-200)">
-        <div class="logo">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <div class="navbar items-center justify-between bg-slate-900 text-white border-none shadow-md">
+        <div class="logo text-emerald-400">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <path
                     d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0016.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 002 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
                 <path
@@ -60,21 +60,33 @@
                 <div class="flex flex-col gap-4">
                     <h2 class="text-2xl font-black text-slate-900">Patient Access</h2>
 
-                    <button class="card p-8 text-center"
-                        style="cursor:pointer;background:var(--emerald-50);border-color:var(--emerald-200);transition:all .2s"
+                    <button
+                        class="card p-10 text-center relative overflow-hidden group border-none shadow-glow-emerald anim-scale"
+                        style="cursor:pointer;background:linear-gradient(135deg, var(--emerald-500), var(--emerald-700));color:#fff"
                         onclick="scanNFC()">
+                        <!-- Pulse Ring -->
                         <div
-                            style="width:4rem;height:4rem;background:var(--emerald-100);color:var(--emerald-600);border-radius:1rem;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem">
-                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <path
-                                    d="M4.8 2.3A.3.3 0 105 2H4a2 2 0 00-2 2v5a6 6 0 006 6v0a6 6 0 006-6V4a2 2 0 00-2-2h-1a.2.2 0 10.3.3" />
-                                <path d="M8 15v1a6 6 0 006 6v0a6 6 0 006-6v-4" />
-                                <circle cx="20" cy="10" r="2" />
-                            </svg>
+                            class="absolute inset-0 border-[6px] border-emerald-400 rounded-3xl opacity-0 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500 ease-out pointer-events-none">
                         </div>
-                        <h3 class="font-black text-lg">Tap NFC Card</h3>
-                        <p class="text-slate-500 text-sm mt-1" id="nfcReadStatus">Scan health card to access profile</p>
+                        <div
+                            class="absolute -inset-4 bg-emerald-400 opacity-0 group-hover:opacity-20 blur-2xl transition-opacity duration-300 pointer-events-none">
+                        </div>
+
+                        <div class="relative z-10">
+                            <div
+                                class="mx-auto mb-4 w-20 h-20 bg-emerald-900/40 rounded-full flex items-center justify-center backdrop-blur-sm border border-emerald-400/50 group-hover:scale-110 transition-transform duration-300 shadow-lg">
+                                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#6ee7b7"
+                                    stroke-width="2.5">
+                                    <path
+                                        d="M4.8 2.3A.3.3 0 105 2H4a2 2 0 00-2 2v5a6 6 0 006 6v0a6 6 0 006-6V4a2 2 0 00-2-2h-1a.2.2 0 10.3.3" />
+                                    <path d="M8 15v1a6 6 0 006 6v0a6 6 0 006-6v-4" />
+                                    <circle cx="20" cy="10" r="2" />
+                                </svg>
+                            </div>
+                            <h3 class="font-black text-2xl mb-1 tracking-tight">Tap NFC Card</h3>
+                            <p class="text-emerald-100/90 text-sm font-medium" id="nfcReadStatus">Scan physical health
+                                card to instantly access medical profile</p>
+                        </div>
                     </button>
 
                     <div style="position:relative;text-align:center;margin:1rem 0">
@@ -100,12 +112,19 @@
                             <div>
                                 <label class="label">Write Patient to NFC Card</label>
                                 <div class="flex gap-2">
-                                    <input type="text" id="nfcWriteId" class="input flex-1" placeholder="Patient ID (e.g. ML-2024-001)">
-                                    <button onclick="writePatientToNFC()" class="btn btn-primary btn-sm" id="btnWriteNfc">Write</button>
+                                    <input type="text" id="nfcWriteId" class="input flex-1"
+                                        placeholder="Patient ID (e.g. ML-2024-001)">
+                                    <button onclick="writePatientToNFC()" class="btn btn-primary btn-sm"
+                                        id="btnWriteNfc">Write</button>
                                 </div>
                             </div>
                             <button onclick="eraseNFC()" class="btn btn-danger w-full" id="btnEraseNfc">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M3 6h18" />
+                                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                                </svg>
                                 Erase NFC Card
                             </button>
                             <p id="nfcManageStatus" class="text-sm font-bold text-slate-500 hidden"></p>
@@ -114,53 +133,69 @@
                 </div>
 
                 <!-- Active Patient view (Hidden until loaded) -->
-                <div id="activePatientPanel" class="card p-8 border-emerald-200 hidden bg-gradient-emerald">
-                    <div class="flex items-center gap-4 mb-8 pb-8" style="border-bottom:1px solid var(--emerald-100)">
-                        <img id="apPhoto" src="" style="width:4rem;height:4rem;border-radius:1rem;object-fit:cover"
-                            class="bg-white">
+                <div id="activePatientPanel"
+                    class="card p-8 border border-emerald-100 hidden relative overflow-hidden bg-white shadow-xl">
+                    <div
+                        class="absolute top-0 right-0 w-64 h-64 bg-emerald-100 rounded-full mix-blend-multiply filter blur-[80px] opacity-60 pointer-events-none">
+                    </div>
+                    <div class="flex items-center gap-6 mb-8 pb-8 relative z-10"
+                        style="border-bottom:1px solid var(--slate-100)">
+                        <img id="apPhoto"
+                            src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop"
+                            class="avatar-xl shadow-md border-4 border-white">
                         <div>
-                            <h3 id="apName" class="text-2xl font-black text-slate-900">...</h3>
-                            <p id="apId" class="text-emerald font-bold tracking-wide">...</p>
+                            <h3 id="apName" class="text-3xl font-black mb-1 text-slate-900">...</h3>
+                            <p id="apId" class="text-emerald-600 font-bold tracking-widest text-sm uppercase">...</p>
                         </div>
-                        <button onclick="downloadPatientCard()" class="btn btn-sm" style="margin-left:auto;background:var(--blue-600);color:#fff;font-size:.7rem">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        <button onclick="downloadPatientCard()" class="btn btn-sm shadow-sm"
+                            style="margin-left:auto;background:var(--emerald-500);color:#fff;font-size:.7rem">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                                <polyline points="7 10 12 15 17 10" />
+                                <line x1="12" y1="15" x2="12" y2="3" />
+                            </svg>
                             Download Card
                         </button>
                     </div>
 
-                    <h4 class="font-black text-slate-900 mb-4 uppercase text-sm">Add New Medical Entry</h4>
-                    <div class="flex flex-col gap-4">
-                        <div class="grid grid-2 gap-4">
-                            <div><label class="label">Test Type</label><input type="text" id="ntType" class="input"
-                                    placeholder="e.g. Blood Test"></div>
-                            <div><label class="label">Test Date</label><input type="date" id="ntDate" class="input">
-                            </div>
+                    <h4 class="font-black mb-6 uppercase text-sm tracking-widest text-slate-500 relative z-10">Add
+                        Medical Entry</h4>
+                    <div
+                        class="flex flex-col gap-6 relative z-10 bg-slate-50 p-8 rounded-2xl border border-slate-200 shadow-inner">
+                        <div class="grid grid-2 gap-6">
+                            <div><label class="label text-slate-700">Test Type</label><input type="text" id="ntType"
+                                    class="input bg-white" placeholder="e.g. Blood Test"></div>
+                            <div><label class="label text-slate-700">Test Date</label><input type="date" id="ntDate"
+                                    class="input bg-white"></div>
                         </div>
-                        <div class="grid grid-2 gap-4">
+                        <div class="grid grid-2 gap-6">
                             <div>
-                                <label class="label">Status</label>
-                                <select id="ntStatus" class="input">
+                                <label class="label text-slate-700">Status</label>
+                                <select id="ntStatus" class="input bg-white">
                                     <option>Normal</option>
                                     <option>Review</option>
                                     <option>Critical</option>
                                 </select>
                             </div>
-                            <div><label class="label">Doctor Name</label><input type="text" id="ntDoc" class="input"
-                                    placeholder="Attending Doctor"></div>
+                            <div><label class="label text-slate-700">Doctor Name</label><input type="text" id="ntDoc"
+                                    class="input bg-white" placeholder="Attending Doctor"></div>
                         </div>
                         <div>
-                            <label class="label">Metric & Value (Optional)</label>
-                            <div class="flex gap-2">
-                                <input type="text" id="ntMetric" class="input" placeholder="e.g. Hemoglobin">
-                                <input type="text" id="ntValue" class="input" placeholder="e.g. 14.2 g/dL">
+                            <label class="label text-slate-700">Metric & Value (Optional)</label>
+                            <div class="flex gap-4">
+                                <input type="text" id="ntMetric" class="input bg-white flex-1"
+                                    placeholder="e.g. Hemoglobin">
+                                <input type="text" id="ntValue" class="input bg-white flex-1"
+                                    placeholder="e.g. 14.2 g/dL">
                             </div>
                         </div>
                         <div>
-                            <label class="label">Upload File (PDF/Image)</label>
-                            <input type="file" id="ntFile" class="input p-2" accept=".pdf,image/*">
+                            <label class="label text-slate-700">Upload File (PDF/Image)</label>
+                            <input type="file" id="ntFile" class="input bg-white p-2 w-full" accept=".pdf,image/*">
                         </div>
-                        <button onclick="submitEntry()" class="btn btn-primary mt-2" id="submitEntryBtn">Save
-                            Entry</button>
+                        <button onclick="submitEntry()" class="btn btn-primary mt-4 py-4 text-base shadow-glow-emerald"
+                            id="submitEntryBtn">Save Entry</button>
                     </div>
                 </div>
 

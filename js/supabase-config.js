@@ -46,9 +46,9 @@ async function fetchPatients() {
     if (!sb) return getFallbackPatients();
     try {
         const { data, error } = await sb.from('patients').select('*');
-        if (error || !data || data.length === 0) return getFallbackPatients();
-        return data;
-    } catch { return getFallbackPatients(); }
+        if (error) { console.error('fetchPatients error:', error); return getFallbackPatients(); }
+        return (data && data.length > 0) ? data : getFallbackPatients();
+    } catch (e) { console.error('fetchPatients exception:', e); return getFallbackPatients(); }
 }
 
 // Fetch single patient
@@ -56,10 +56,10 @@ async function fetchPatient(patientId) {
     const sb = getSupabase();
     if (!sb) return getFallbackPatients().find(p => p.id === patientId);
     try {
-        const { data, error } = await sb.from('patients').select('*').eq('id', patientId).single();
-        if (error || !data) return getFallbackPatients().find(p => p.id === patientId);
-        return data;
-    } catch { return getFallbackPatients().find(p => p.id === patientId); }
+        const { data, error } = await sb.from('patients').select('*').eq('id', patientId).maybeSingle();
+        if (error) { console.error('fetchPatient error:', error); return getFallbackPatients().find(p => p.id === patientId); }
+        return data || getFallbackPatients().find(p => p.id === patientId);
+    } catch (e) { console.error('fetchPatient exception:', e); return getFallbackPatients().find(p => p.id === patientId); }
 }
 
 // Fetch reports for a patient
@@ -68,9 +68,9 @@ async function fetchReports(patientId) {
     if (!sb) return getFallbackReports(patientId);
     try {
         const { data, error } = await sb.from('medical_reports').select('*').eq('patient_id', patientId).order('date', { ascending: false });
-        if (error || !data || data.length === 0) return getFallbackReports(patientId);
-        return data;
-    } catch { return getFallbackReports(patientId); }
+        if (error) { console.error('fetchReports error:', error); return getFallbackReports(patientId); }
+        return data || [];
+    } catch (e) { console.error('fetchReports exception:', e); return getFallbackReports(patientId); }
 }
 
 // Fetch all doctors
@@ -79,9 +79,9 @@ async function fetchDoctors() {
     if (!sb) return getFallbackDoctors();
     try {
         const { data, error } = await sb.from('doctors').select('*');
-        if (error || !data || data.length === 0) return getFallbackDoctors();
-        return data;
-    } catch { return getFallbackDoctors(); }
+        if (error) { console.error('fetchDoctors error:', error); return getFallbackDoctors(); }
+        return (data && data.length > 0) ? data : getFallbackDoctors();
+    } catch (e) { console.error('fetchDoctors exception:', e); return getFallbackDoctors(); }
 }
 
 // Fetch appointments for patient
@@ -90,8 +90,9 @@ async function fetchAppointments(patientId) {
     if (!sb) return [];
     try {
         const { data, error } = await sb.from('appointments').select('*').eq('patient_id', patientId).order('appointment_date', { ascending: true });
+        if (error) console.error('fetchAppointments error:', error);
         return error ? [] : (data || []);
-    } catch { return []; }
+    } catch (e) { console.error('fetchAppointments exception:', e); return []; }
 }
 
 // Fetch doctor's linked patients
@@ -134,8 +135,9 @@ async function saveReport(patientId, report) {
     if (!sb) return false;
     try {
         const { error } = await sb.from('medical_reports').insert({ patient_id: patientId, ...report });
+        if (error) console.error('saveReport error:', error);
         return !error;
-    } catch { return false; }
+    } catch (e) { console.error('saveReport exception:', e); return false; }
 }
 
 // Save appointment
@@ -144,8 +146,9 @@ async function saveAppointment(appt) {
     if (!sb) return false;
     try {
         const { error } = await sb.from('appointments').insert(appt);
+        if (error) console.error('saveAppointment error:', error);
         return !error;
-    } catch { return false; }
+    } catch (e) { console.error('saveAppointment exception:', e); return false; }
 }
 
 // Delete appointment
@@ -163,7 +166,7 @@ async function findDoctorByUserId(userId) {
     const sb = getSupabase();
     if (!sb) return null;
     try {
-        const { data, error } = await sb.from('doctors').select('*').eq('user_id', userId).single();
+        const { data, error } = await sb.from('doctors').select('*').eq('user_id', userId).maybeSingle();
         return error ? null : data;
     } catch { return null; }
 }
@@ -173,7 +176,7 @@ async function findPatientByUserId(userId) {
     const sb = getSupabase();
     if (!sb) return null;
     try {
-        const { data, error } = await sb.from('patients').select('*').eq('user_id', userId).single();
+        const { data, error } = await sb.from('patients').select('*').eq('user_id', userId).maybeSingle();
         return error ? null : data;
     } catch { return null; }
 }
