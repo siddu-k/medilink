@@ -217,6 +217,14 @@
                                 Write to NFC Card
                             </button>
 
+                            <button class="btn" onclick="downloadVirtualCard()"
+                                style="padding:1rem;font-size:.8rem;background:var(--blue-600);color:#fff">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                                </svg>
+                                Download Card Sticker
+                            </button>
+
                             <p id="nfcStatus" class="text-sm font-bold text-slate-500 hidden mt-2"></p>
 
                             <div class="mt-4 p-4 bg-emerald-50 rounded-2xl border border-emerald-100 text-sm">
@@ -593,6 +601,132 @@
                 status.textContent = '❌ Error: ' + err.message;
                 btn.textContent = 'Write to NFC Card'; btn.disabled = false;
             }
+        }
+
+        // ===== DOWNLOAD VIRTUAL CARD =====
+        function downloadVirtualCard() {
+            const p = currentPatient;
+            if (!p) return;
+            const profileUrl = window.location.origin + window.location.pathname.replace('patient.html', 'profile.html?id=' + p.id);
+            generateCardImage(p, profileUrl, 'MediLink_Card_' + p.id + '.png');
+        }
+
+        function generateCardImage(p, qrUrl, filename) {
+            const W = 856, H = 540; // credit card ratio at 10x
+            const canvas = document.createElement('canvas');
+            canvas.width = W; canvas.height = H;
+            const ctx = canvas.getContext('2d');
+
+            // Background gradient
+            const grad = ctx.createLinearGradient(0, 0, W, H);
+            grad.addColorStop(0, '#059669'); grad.addColorStop(1, '#0d9488');
+            ctx.fillStyle = grad;
+            roundRect(ctx, 0, 0, W, H, 30, true);
+
+            // Subtle pattern
+            ctx.fillStyle = 'rgba(255,255,255,0.04)';
+            for (let i = 0; i < 6; i++) {
+                ctx.beginPath(); ctx.arc(W - 100 + i * 30, 100 + i * 40, 120 - i * 15, 0, Math.PI * 2); ctx.fill();
+            }
+
+            // Top: MEDILINK ID label
+            ctx.fillStyle = 'rgba(255,255,255,0.7)';
+            ctx.font = 'bold 18px Inter, system-ui, sans-serif';
+            ctx.letterSpacing = '4px';
+            ctx.fillText('MEDILINK HEALTH CARD', 50, 55);
+
+            // Name
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 42px Inter, system-ui, sans-serif';
+            ctx.fillText(p.name || 'Patient', 50, 140);
+
+            // ID
+            ctx.fillStyle = 'rgba(255,255,255,0.6)';
+            ctx.font = 'bold 20px Inter, system-ui, sans-serif';
+            ctx.fillText('ID: ' + p.id, 50, 180);
+
+            // Divider
+            ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(50, 220); ctx.lineTo(W - 250, 220); ctx.stroke();
+
+            // Info columns
+            ctx.fillStyle = 'rgba(255,255,255,0.5)';
+            ctx.font = 'bold 14px Inter, system-ui, sans-serif';
+            ctx.fillText('BLOOD GROUP', 50, 260);
+            ctx.fillText('AGE', 220, 260);
+            ctx.fillText('PHONE', 350, 260);
+
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 32px Inter, system-ui, sans-serif';
+            ctx.fillText(p.blood_group || '--', 50, 300);
+            ctx.font = 'bold 28px Inter, system-ui, sans-serif';
+            ctx.fillText(p.age ? p.age + ' yrs' : '--', 220, 300);
+            ctx.font = 'bold 20px Inter, system-ui, sans-serif';
+            ctx.fillText(p.phone || '--', 350, 300);
+
+            // Allergies
+            if (p.allergies && p.allergies.length > 0 && p.allergies[0]) {
+                ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                ctx.font = 'bold 14px Inter, system-ui, sans-serif';
+                ctx.fillText('ALLERGIES', 50, 360);
+                ctx.fillStyle = '#fecaca';
+                ctx.font = 'bold 18px Inter, system-ui, sans-serif';
+                ctx.fillText(p.allergies.join(', '), 50, 390);
+            }
+
+            // Emergency contact
+            if (p.emergency_contact) {
+                ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                ctx.font = 'bold 14px Inter, system-ui, sans-serif';
+                ctx.fillText('EMERGENCY CONTACT', 50, 440);
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 18px Inter, system-ui, sans-serif';
+                ctx.fillText(p.emergency_contact, 50, 470);
+            }
+
+            // Bottom line
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.font = '14px Inter, system-ui, sans-serif';
+            ctx.fillText('Scan QR to view full profile', 50, H - 30);
+
+            // QR code on the right
+            const qrSize = 200;
+            const qrX = W - qrSize - 50, qrY = (H - qrSize) / 2;
+            // White rounded background for QR
+            ctx.fillStyle = '#fff';
+            roundRect(ctx, qrX - 15, qrY - 15, qrSize + 30, qrSize + 30, 16, true);
+
+            // Render QR into a temp div, draw onto canvas
+            const tempDiv = document.createElement('div');
+            tempDiv.style.cssText = 'position:absolute;left:-9999px;top:-9999px';
+            document.body.appendChild(tempDiv);
+            new QRCode(tempDiv, { text: qrUrl, width: qrSize, height: qrSize, colorDark: '#0f172a', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+
+            // Wait for QR canvas to render
+            setTimeout(() => {
+                const qrCanvas = tempDiv.querySelector('canvas');
+                if (qrCanvas) ctx.drawImage(qrCanvas, qrX, qrY, qrSize, qrSize);
+                tempDiv.remove();
+
+                // Download
+                const link = document.createElement('a');
+                link.download = filename;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                showToast('Card downloaded!', 'success');
+            }, 300);
+        }
+
+        function roundRect(ctx, x, y, w, h, r, fill) {
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+            ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+            ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+            if (fill) ctx.fill();
         }
 
         // ===== PROFILE FORM =====
