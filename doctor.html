@@ -182,13 +182,18 @@
 
             // If no doctor record yet, create one
             if (!doctorRecord && sb) {
+                const savedHospital = localStorage.getItem('medilink_doctor_hospital') || 'MediLink Hospital';
+                const savedSpecialty = localStorage.getItem('medilink_doctor_specialty') || 'General';
                 const { data: newDoc } = await sb.from('doctors').insert({
                     user_id: currentUser.user.id,
                     name: currentUser.profile.full_name,
-                    specialty: 'General',
-                    hospital: 'MediLink Hospital'
+                    specialty: savedSpecialty,
+                    hospital: savedHospital
                 }).select().single();
                 doctorRecord = newDoc;
+                // Clean up
+                localStorage.removeItem('medilink_doctor_hospital');
+                localStorage.removeItem('medilink_doctor_specialty');
             }
 
             if (doctorRecord) {

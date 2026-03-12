@@ -78,11 +78,21 @@
                     </div>
                     <div>
                         <label class="label">Register As</label>
-                        <select id="signupRole" class="input">
+                        <select id="signupRole" class="input" onchange="onSignupRoleChange()">
                             <option value="patient">Patient</option>
                             <option value="hospital">Hospital Staff</option>
                             <option value="doctor">Doctor</option>
                         </select>
+                    </div>
+                    <div id="hospitalSelectWrap" class="hidden">
+                        <label class="label">Select Your Hospital</label>
+                        <select id="signupHospital" class="input">
+                            <option value="">Loading hospitals...</option>
+                        </select>
+                    </div>
+                    <div id="specialtyWrap" class="hidden">
+                        <label class="label">Specialty</label>
+                        <input type="text" id="signupSpecialty" placeholder="e.g. Cardiologist" class="input">
                     </div>
                 </div>
                 <button onclick="handleSignup()" class="btn btn-primary w-full" style="padding:1rem"
@@ -123,6 +133,15 @@
             if (!name || !email || !password) { showToast('Please fill all fields', 'error'); return; }
             if (password.length < 6) { showToast('Password must be at least 6 characters', 'error'); return; }
 
+            // Doctor must select a hospital
+            if (role === 'doctor') {
+                const hospital = document.getElementById('signupHospital').value;
+                if (!hospital) { showToast('Please select your hospital', 'error'); return; }
+                localStorage.setItem('medilink_doctor_hospital', hospital);
+                const specialty = document.getElementById('signupSpecialty').value || 'General';
+                localStorage.setItem('medilink_doctor_specialty', specialty);
+            }
+
             const btn = document.getElementById('signupBtn');
             btn.textContent = 'Creating...'; btn.disabled = true;
 
@@ -133,6 +152,36 @@
             } else {
                 btn.textContent = 'Create Account'; btn.disabled = false;
             }
+        }
+
+        // Show/hide hospital dropdown when doctor role selected
+        function onSignupRoleChange() {
+            const role = document.getElementById('signupRole').value;
+            const wrap = document.getElementById('hospitalSelectWrap');
+            const specWrap = document.getElementById('specialtyWrap');
+            if (role === 'doctor') {
+                wrap.classList.remove('hidden');
+                specWrap.classList.remove('hidden');
+                loadHospitals();
+            } else {
+                wrap.classList.add('hidden');
+                specWrap.classList.add('hidden');
+            }
+        }
+
+        // Load registered hospitals from profiles table
+        async function loadHospitals() {
+            const sel = document.getElementById('signupHospital');
+            sel.innerHTML = '<option value="">Loading...</option>';
+            const sb = await waitForSupabase();
+            if (!sb) { sel.innerHTML = '<option value="">No hospitals found</option>'; return; }
+            const { data, error } = await sb.from('profiles').select('full_name').eq('role', 'hospital');
+            if (error || !data || data.length === 0) {
+                sel.innerHTML = '<option value="">No hospitals registered yet</option>';
+                return;
+            }
+            sel.innerHTML = '<option value="">-- Select Hospital --</option>' +
+                data.map(h => `<option value="${h.full_name}">${h.full_name}</option>`).join('');
         }
 
         // Auto-redirect if already logged in
